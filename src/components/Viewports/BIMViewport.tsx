@@ -128,7 +128,6 @@ export function BIMViewport() {
                      className="w-16 bg-black border border-orange-500/30 text-white text-right px-1 py-0.5 rounded text-[9px] focus:border-orange-500 focus:outline-none transition-colors"
                      value={selectedPart.length}
                      onChange={e => updateSelectedPart({ length: Number(e.target.value) })}
-                     disabled={!activeModel}
                   />
                 </div>
                 <div className="flex justify-between items-center text-[9px] mb-1">
@@ -137,7 +136,6 @@ export function BIMViewport() {
                      className="w-16 bg-black border border-orange-500/30 text-white px-1 py-0.5 rounded text-[9px] focus:border-orange-500 focus:outline-none transition-colors"
                      value={selectedPart.profile}
                      onChange={e => updateSelectedPart({ profile: e.target.value })}
-                     disabled={!activeModel}
                   >
                     <option value="100x50mm">100x50</option>
                     <option value="150x50mm">150x50</option>
@@ -151,11 +149,12 @@ export function BIMViewport() {
                      className="w-16 bg-black border border-orange-500/30 text-white px-1 py-0.5 rounded text-[9px] focus:border-orange-500 focus:outline-none transition-colors"
                      value={selectedPart.material}
                      onChange={e => updateSelectedPart({ material: e.target.value })}
-                     disabled={!activeModel}
                   >
                     <option value="Oak">{t("bim.oak") || "Oak"}</option>
                     <option value="Pine">{t("bim.pine") || "Pine"}</option>
                     <option value="Walnut">{t("bim.walnut") || "Walnut"}</option>
+                    <option value="Maple">{t("bim.maple") || "Maple"}</option>
+                    <option value="Steel">{t("bim.steel") || "Steel"}</option>
                   </select>
                 </div>
                 <PropertyRow label={t("bim.join")} value={t("bim.join.val")} />
@@ -203,7 +202,7 @@ export function BIMViewport() {
                <g className="text-orange-500/80" fill="none" stroke="currentColor" strokeWidth="1">
                  {/* Main stud */}
                  <motion.path 
-                   onClick={() => activeModel && setSelectedPartId("S-201")}
+                   onClick={() => setSelectedPartId("S-201")}
                    className={`cursor-pointer transition-colors ${selectedPartId === "S-201" ? "fill-orange-500/30 stroke-orange-500" : "fill-orange-500/10 stroke-orange-500/50 hover:fill-orange-500/20"}`}
                    d="M 180 80 L 200 70 L 200 220 L 180 230 Z" 
                    initial={{ opacity: 0, y: 10 }}
@@ -214,7 +213,7 @@ export function BIMViewport() {
                  
                  {/* Connecting beam (Custom Part) */}
                  <motion.path 
-                   onClick={() => activeModel && setSelectedPartId("B-104")}
+                   onClick={() => setSelectedPartId("B-104")}
                    className={`cursor-pointer transition-colors ${selectedPartId === "B-104" ? "fill-orange-500/40 stroke-orange-400" : "fill-orange-500/20 stroke-orange-500/50 hover:fill-orange-500/30"}`}
                    d="M 200 100 L 320 160 L 320 180 L 200 120 Z" 
                    strokeWidth="1.5"

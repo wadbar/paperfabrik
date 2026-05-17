@@ -59,6 +59,8 @@ export const translations: TranslationDictionary = {
   "bim.pine": { en: "Pine", pt: "Pinho" },
   "bim.oak": { en: "Oak", pt: "Carvalho" },
   "bim.walnut": { en: "Walnut", pt: "Nogueira" },
+  "bim.maple": { en: "Maple", pt: "Bordo" },
+  "bim.steel": { en: "Steel", pt: "Aço" },
   "bim.properties": { en: "Properties", pt: "Propriedades" },
 
   "cad.tree": { en: "Feature Tree", pt: "Árvore de Recursos" },
@@ -103,6 +105,8 @@ export const translations: TranslationDictionary = {
   "panel.pbr.action": { en: "EXPORT TEXTURE", pt: "EXPORTAR TEXTURA" },
   "panel.openscad.title": { en: "SCRIPTING CAD", pt: "CAD POR CÓDIGO" },
   "panel.openscad.action": { en: "RENDER SCRIPT", pt: "RENDERIZAR SCRIPT" },
+  "panel.hyworld.title": { en: "AI 3D WORLD GEN", pt: "GERAÇÃO MUNDO 3D IA" },
+  "panel.hyworld.action": { en: "SYNTHESIZE", pt: "SINTETIZAR" },
   "pbr.layers": { en: "Layers", pt: "Camadas" },
   "pbr.smart_materials": { en: "Smart Materials", pt: "Materiais Inteligentes" },
   "pbr.properties": { en: "Material Properties", pt: "Propriedades" },

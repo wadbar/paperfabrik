@@ -16,7 +16,8 @@ import { CircuitViewport } from "./components/Viewports/CircuitViewport";
 import { PBRTexturingViewport } from "./components/Viewports/PBRTexturingViewport";
 import { TinkercadViewport } from "./components/Viewports/TinkercadViewport";
 import { OpenSCADViewport } from "./components/Viewports/OpenSCADViewport";
-import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu, Palette, Zap, CodeSquare } from "lucide-react";
+import { HYWorldViewport } from "./components/Viewports/HYWorldViewport";
+import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu, Palette, Zap, CodeSquare, Globe } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useI18n } from "./lib/i18n";
 
@@ -136,9 +137,21 @@ export default function App() {
               accentColor="text-yellow-500"
               accentBg="bg-yellow-900/20 border-yellow-500/30"
               actionText={t("panel.openscad.action") || "RENDER SCRIPT"}
-              className="xl:col-span-2"
             >
               <OpenSCADViewport />
+            </FabricationPanel>
+
+            <FabricationPanel 
+              id_num="10"
+              title={t("panel.hyworld.title") || "AI 3D WORLD GEN"} 
+              filename="HY_WorldMirror_Model.pkl"
+              icon={Globe}
+              accentColor="text-pink-500"
+              accentBg="bg-pink-900/20 border-pink-500/30"
+              actionText={t("panel.hyworld.action") || "SYNTHESIZE"}
+              className="xl:col-span-2"
+            >
+              <HYWorldViewport />
             </FabricationPanel>
           </div>
         </main>
