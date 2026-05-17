@@ -8,14 +8,43 @@ export function HYWorldViewport() {
   const [activeTab, setActiveTab] = useState<'reconstruct' | 'generate'>('reconstruct');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processState, setProcessState] = useState(0); // 0=idle, 1=processing, 2=done
+  const [synthesizedData, setSynthesizedData] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleRun = () => {
+  const handleRun = async () => {
     setIsProcessing(true);
     setProcessState(1);
-    setTimeout(() => {
+    setErrorMsg(null);
+    
+    try {
+      // Connect to the external daemon process
+      const res = await fetch("/api/synthesize/hyworld", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelOptions: {
+             task: activeTab,
+             precision: "high",
+             timestamp: new Date().toISOString()
+          }
+        })
+      });
+      
+      const payload = await res.json();
+      
+      if (!res.ok || payload.status === "error") {
+        throw new Error(payload.message || "Synthesis Daemon responded with an error.");
+      }
+      
+      setSynthesizedData(payload.data);
       setProcessState(2);
+    } catch (err: any) {
+      console.error("[TELEMETRY] HYWorld Viewport - Synthesizer failed:", err);
+      setErrorMsg(err.message);
+      setProcessState(0);
+    } finally {
       setIsProcessing(false);
-    }, 2500);
+    }
   };
 
   return (
@@ -113,9 +142,11 @@ export function HYWorldViewport() {
              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at center, #ec4899 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
              
              {processState === 0 && (
-                <div className="text-white/30 text-[10px] uppercase font-bold flex flex-col items-center gap-2">
+                <div className="text-white/30 text-[10px] uppercase font-bold flex flex-col items-center gap-2 text-center px-4">
                    <Rotate3D className="w-8 h-8 opacity-50" />
-                   Ready to initialize 3D generation
+                   {errorMsg ? (
+                      <span className="text-red-400">DAEMON FAULT: {errorMsg}</span>
+                   ) : "Ready to initialize 3D generation daemon process."}
                 </div>
              )}
 
@@ -169,8 +200,10 @@ export function HYWorldViewport() {
                               <path d="M-20 -10 L20 -10 L20 10 L-20 10 Z" fill="none" stroke="rgba(236,72,153,0.4)" strokeWidth={0.5} strokeDasharray="2 2" transform="rotateUserSpace" />
                            </motion.svg>
                            <div className="absolute bottom-2 left-2 px-1.5 py-1 bg-black/60 border border-white/10 rounded text-pink-500/80 font-bold text-[8px] flex flex-col gap-0.5 backdrop-blur-md">
-                             <span>Gaussian Splatting: 1.2M points</span>
-                             <span>Depth Map: Aligned</span>
+                             <span>Gaussian Point Count: {synthesizedData?.pointCount?.toLocaleString() || "1,200,000"}</span>
+                             <span>Engine Hash: {synthesizedData?.hash || "NULL"}</span>
+                             <span>Cameras: {synthesizedData?.cameraPoses || "Aligned"}</span>
+                             <span>Mesh Size: {synthesizedData?.simulatedMeshSize || "0 MB"}</span>
                            </div>
                         </div>
                      ) : (

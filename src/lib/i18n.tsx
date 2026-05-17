@@ -64,6 +64,7 @@ export const translations: TranslationDictionary = {
   "bim.properties": { en: "Properties", pt: "Propriedades" },
 
   "cad.tree": { en: "Feature Tree", pt: "Árvore de Recursos" },
+  "cad.render_settings": { en: "Render Settings", pt: "Configurações de Render" },
   "cad.base_sketch": { en: "Base_Sketch", pt: "Esboço_Base" },
   "cad.top": { en: "TOP", pt: "TOPO" },
 
@@ -113,6 +114,8 @@ export const translations: TranslationDictionary = {
   "pbr.mat.rust": { en: "Smart Rust", pt: "Ferrugem Int." },
   "pbr.mat.chrome": { en: "Scratched Chrome", pt: "Cromo Riscado" },
   "pbr.mat.wood": { en: "Varnished Wood", pt: "Madeira Envernizada" },
+  "pbr.mat.maple": { en: "Maple", pt: "Bordo" },
+  "pbr.mat.steel": { en: "Brushed Steel", pt: "Aço Escovado" },
   "pbr.roughness": { en: "Roughness", pt: "Rugosidade" },
   "pbr.metalness": { en: "Metalness", pt: "Metalização" },
   "pbr.ao": { en: "Ambient Occlusion", pt: "Oclusão Ambiental" },

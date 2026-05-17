@@ -8,10 +8,14 @@ export function PBRTexturingViewport() {
   const [activeMaterial, setActiveMaterial] = useState("smart_rust");
   
   const smartMaterials = [
-    { id: "smart_rust", nameKey: "pbr.mat.rust", fallback: "Smart Rust" },
-    { id: "chrome", nameKey: "pbr.mat.chrome", fallback: "Scratched Chrome" },
-    { id: "wood", nameKey: "pbr.mat.wood", fallback: "Varnished Wood" }
+    { id: "smart_rust", nameKey: "pbr.mat.rust", fallback: "Smart Rust", props: { roughness: 65, metalness: 10, ao: 100 } },
+    { id: "chrome", nameKey: "pbr.mat.chrome", fallback: "Scratched Chrome", props: { roughness: 15, metalness: 90, ao: 95 } },
+    { id: "wood", nameKey: "pbr.mat.wood", fallback: "Varnished Wood", props: { roughness: 30, metalness: 5, ao: 80 } },
+    { id: "maple", nameKey: "pbr.mat.maple", fallback: "Maple", props: { roughness: 45, metalness: 2, ao: 75 } },
+    { id: "steel", nameKey: "pbr.mat.steel", fallback: "Brushed Steel", props: { roughness: 20, metalness: 85, ao: 90 } }
   ];
+
+  const activeMatObj = smartMaterials.find(m => m.id === activeMaterial) || smartMaterials[0];
 
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-purple-500/30">
@@ -103,9 +107,17 @@ export function PBRTexturingViewport() {
                 <div 
                   key={mat.id}
                   onClick={() => setActiveMaterial(mat.id)}
-                  className={`col-span-2 p-1.5 text-[8px] font-bold rounded cursor-pointer transition-colors border ${activeMaterial === mat.id ? 'bg-purple-900/40 border-purple-500 text-white' : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:border-white/20'}`}
+                  className={`p-2 rounded border cursor-pointer transition-colors flex flex-col items-center gap-1 text-center ${activeMaterial === mat.id ? 'bg-purple-900/40 border-purple-500/50' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                 >
-                  {t(mat.nameKey) || mat.fallback}
+                  <div className="w-8 h-8 rounded-full shadow-inner" style={{
+                    background: mat.id === 'smart_rust' ? 'linear-gradient(to top right, #431407, #c2410c)' :
+                                mat.id === 'chrome' ? 'linear-gradient(to top right, #9ca3af, #f3f4f6)' :
+                                mat.id === 'wood' ? 'linear-gradient(to top right, #451a03, #92400e)' :
+                                mat.id === 'maple' ? 'linear-gradient(to top right, #78350f, #d97706)' :
+                                mat.id === 'steel' ? 'linear-gradient(to top right, #374151, #9ca3af)' :
+                                'linear-gradient(to top right, #1f2937, #6b7280)'
+                  }}/>
+                  <span className={`text-[7px] font-bold ${activeMaterial === mat.id ? 'text-purple-300' : 'text-white/60'}`}>{t(mat.nameKey) || mat.fallback}</span>
                 </div>
               ))}
             </div>
@@ -119,28 +131,28 @@ export function PBRTexturingViewport() {
                <div>
                  <div className="flex justify-between text-[7px] text-white/60 uppercase font-bold mb-1">
                    <span>{t("pbr.roughness") || "Roughness"}</span>
-                   <span>65%</span>
+                   <span>{activeMatObj?.props.roughness || 0}%</span>
                  </div>
                  <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                   <div className="h-full bg-stone-400 w-[65%]"></div>
+                   <div className="h-full bg-stone-400" style={{ width: `${activeMatObj?.props.roughness || 0}%` }}></div>
                  </div>
                </div>
                <div>
                  <div className="flex justify-between text-[7px] text-white/60 uppercase font-bold mb-1">
                    <span>{t("pbr.metalness") || "Metalness"}</span>
-                   <span>10%</span>
+                   <span>{activeMatObj?.props.metalness || 0}%</span>
                  </div>
                  <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                   <div className="h-full bg-stone-400 w-[10%]"></div>
+                   <div className="h-full bg-stone-400" style={{ width: `${activeMatObj?.props.metalness || 0}%` }}></div>
                  </div>
                </div>
                <div>
                  <div className="flex justify-between text-[7px] text-white/60 uppercase font-bold mb-1">
                    <span>{t("pbr.ao") || "Ambient Occlusion"}</span>
-                   <span>100%</span>
+                   <span>{activeMatObj?.props.ao || 0}%</span>
                  </div>
                  <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                   <div className="h-full bg-purple-400 w-full shadow-[0_0_8px_rgba(168,85,247,0.8)]"></div>
+                   <div className="h-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" style={{ width: `${activeMatObj?.props.ao || 0}%` }}></div>
                  </div>
                </div>
              </div>

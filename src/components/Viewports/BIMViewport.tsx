@@ -38,6 +38,38 @@ export function BIMViewport() {
     setParts(parts.map(p => p.id === selectedPartId ? { ...p, ...updates } : p));
   };
   
+  const [isCncProcessing, setIsCncProcessing] = useState(false);
+  const [cncData, setCncData] = useState<any>(null);
+
+  const calculateCncProperties = async () => {
+     if (!selectedPart) return;
+     setIsCncProcessing(true);
+     try {
+        const res = await fetch("/api/cnc/process", {
+           method: "POST",
+           headers: { "Content-Type": "application/json" },
+           body: JSON.stringify({
+              partId: selectedPart.id,
+              length: selectedPart.length,
+              material: selectedPart.material
+           })
+        });
+        const payload = await res.json();
+        if (payload.status === "success") {
+           setCncData(payload.data);
+        }
+     } catch(err) {
+        console.error("CNC Daemon fault:", err);
+     } finally {
+        setIsCncProcessing(false);
+     }
+  };
+
+  // Re-calculate when part changes
+  React.useEffect(() => {
+     calculateCncProperties();
+  }, [selectedPartId, selectedPart?.length, selectedPart?.material, selectedPart?.profile]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImport = () => {
@@ -175,8 +207,8 @@ export function BIMViewport() {
             {selectedPart && selectedPart.type === 'beam' && (
               <PropertySection title={t("bim.cnc_path")} id="SYS">
                 <PropertyRow label={t("bim.tool")} value="Flat End 12mm" />
-                <PropertyRow label={t("bim.passes")} value={`${Math.ceil(selectedPart.length / 800)} x 12.5mm`} />
-                <PropertyRow label={t("bim.time")} value={`${((selectedPart.length / getMaterialFeedRate(selectedPart.material)) * Math.ceil(selectedPart.length / 800)).toFixed(1)}m`} />
+                <PropertyRow label={t("bim.passes")} value={cncData ? `${cncData.passes} x 12.5mm` : "Calculating..."} />
+                <PropertyRow label={t("bim.time")} value={cncData ? `${cncData.machineTimeMinutes}m` : (isCncProcessing ? "Processing..." : "...")} />
               </PropertySection>
             )}
           </div>
