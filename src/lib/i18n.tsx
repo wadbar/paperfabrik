@@ -21,8 +21,8 @@ export const translations: TranslationDictionary = {
   
   "panel.cad.title": { en: "CAD ENGINEERING", pt: "ENGENHARIA CAD" },
   "panel.cad.action": { en: "ENGINEERING PLAN", pt: "PLANO DE ENGENHARIA" },
-  "panel.3d.title": { en: "3D PRECISION MESH", pt: "MALHA DE PRECISÃO 3D" },
-  "panel.3d.action": { en: "SLICE MESH", pt: "FATIAR MALHA" },
+  "panel.3d.title": { en: "MODIFIERS SQUAD", pt: "MODIFICADORES SQUAD" },
+  "panel.3d.action": { en: "APPLY ALL MODIFIERS", pt: "APLICAR MODIFICADORES" },
   "panel.cnc.title": { en: "PRECISION CNC ROUTER", pt: "ROUTER CNC DE PRECISÃO" },
   "panel.cnc.action": { en: "GENERATE G-CODE", pt: "GERAR G-CODE" },
   "panel.pkg.title": { en: "DIE-CUT TEMPLATES", pt: "MOLDES DE CORTE" },
@@ -95,6 +95,23 @@ export const translations: TranslationDictionary = {
   "pcb.layer": { en: "Active Layer", pt: "Camada Ativa" },
   "pcb.gerber": { en: "GENERATE GERBER", pt: "GERAR GERBER" },
   "pcb.top_copper": { en: "Top Copper (F.Cu)", pt: "Cobre Superior (F.Cu)" },
+
+  "panel.tinker.title": { en: "ELECTRONICS SIM", pt: "SIM DE ELETRÔNICA" },
+  "panel.tinker.action": { en: "UPLOAD FIRMWARE", pt: "ENVIAR FIRMWARE" },
+
+  "panel.pbr.title": { en: "PBR MATERIAL STUDIO", pt: "ESTÚDIO MATERIAL PBR" },
+  "panel.pbr.action": { en: "EXPORT TEXTURE", pt: "EXPORTAR TEXTURA" },
+  "panel.openscad.title": { en: "SCRIPTING CAD", pt: "CAD POR CÓDIGO" },
+  "panel.openscad.action": { en: "RENDER SCRIPT", pt: "RENDERIZAR SCRIPT" },
+  "pbr.layers": { en: "Layers", pt: "Camadas" },
+  "pbr.smart_materials": { en: "Smart Materials", pt: "Materiais Inteligentes" },
+  "pbr.properties": { en: "Material Properties", pt: "Propriedades" },
+  "pbr.mat.rust": { en: "Smart Rust", pt: "Ferrugem Int." },
+  "pbr.mat.chrome": { en: "Scratched Chrome", pt: "Cromo Riscado" },
+  "pbr.mat.wood": { en: "Varnished Wood", pt: "Madeira Envernizada" },
+  "pbr.roughness": { en: "Roughness", pt: "Rugosidade" },
+  "pbr.metalness": { en: "Metalness", pt: "Metalização" },
+  "pbr.ao": { en: "Ambient Occlusion", pt: "Oclusão Ambiental" },
 };
 
 interface I18nContextType {

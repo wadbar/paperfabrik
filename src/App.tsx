@@ -13,7 +13,10 @@ import { PackagingViewport } from "./components/Viewports/PackagingViewport";
 import { BIMViewport } from "./components/Viewports/BIMViewport";
 import { CADViewport } from "./components/Viewports/CADViewport";
 import { CircuitViewport } from "./components/Viewports/CircuitViewport";
-import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu } from "lucide-react";
+import { PBRTexturingViewport } from "./components/Viewports/PBRTexturingViewport";
+import { TinkercadViewport } from "./components/Viewports/TinkercadViewport";
+import { OpenSCADViewport } from "./components/Viewports/OpenSCADViewport";
+import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu, Palette, Zap, CodeSquare } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useI18n } from "./lib/i18n";
 
@@ -27,78 +30,117 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header />
         
-        <main className="flex-1 grid grid-cols-3 grid-rows-2 gap-[1px] bg-studio-grid overflow-hidden">
-          <FabricationPanel 
-            id_num="01"
-            title={t("panel.cad.title")} 
-            filename="Chassis_Parametric_V2.step"
-            icon={Compass}
-            accentColor="text-blue-400"
-            accentBg="bg-blue-900/20 border-blue-500/30"
-            actionText={t("panel.cad.action")}
-          >
-            <CADViewport />
-          </FabricationPanel>
+        <main className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 auto-rows-[minmax(300px,1fr)] xl:auto-rows-[minmax(380px,1fr)] gap-[1px] bg-studio-grid min-h-full">
+            <FabricationPanel 
+              id_num="01"
+              title={t("panel.cad.title")} 
+              filename="Chassis_Parametric_V2.step"
+              icon={Compass}
+              accentColor="text-blue-400"
+              accentBg="bg-blue-900/20 border-blue-500/30"
+              actionText={t("panel.cad.action")}
+            >
+              <CADViewport />
+            </FabricationPanel>
 
-          <FabricationPanel 
-            id_num="02"
-            title={t("panel.3d.title")} 
-            filename="Mesh_Gear_V9.stl"
-            icon={Box}
-            accentColor="text-3d-accent"
-            accentBg="bg-blue-900/20 border-blue-500/30"
-            actionText={t("panel.3d.action")}
-          >
-            <ThreeDPrintingViewport />
-          </FabricationPanel>
+            <FabricationPanel 
+              id_num="02"
+              title={t("panel.3d.title")} 
+              filename="Mesh_Gear_V9.stl"
+              icon={Box}
+              accentColor="text-3d-accent"
+              accentBg="bg-blue-900/20 border-blue-500/30"
+              actionText={t("panel.3d.action")}
+            >
+              <ThreeDPrintingViewport />
+            </FabricationPanel>
 
-          <FabricationPanel 
-            id_num="03"
-            title={t("panel.cnc.title")} 
-            filename="Machining_Gcode_V1.nc"
-            icon={Hammer}
-            accentColor="text-wood-accent"
-            accentBg="bg-amber-900/20 border-amber-500/30"
-            actionText={t("panel.cnc.action")}
-          >
-            <CNCRouterViewport />
-          </FabricationPanel>
+            <FabricationPanel 
+              id_num="03"
+              title={t("panel.cnc.title")} 
+              filename="Machining_Gcode_V1.nc"
+              icon={Hammer}
+              accentColor="text-wood-accent"
+              accentBg="bg-amber-900/20 border-amber-500/30"
+              actionText={t("panel.cnc.action")}
+            >
+              <CNCRouterViewport />
+            </FabricationPanel>
 
-          <FabricationPanel 
-            id_num="04"
-            title={t("panel.pkg.title")} 
-            filename="HexBox_250gsm.plt"
-            icon={LayoutTemplate}
-            accentColor="text-pack-accent"
-            accentBg="bg-emerald-900/20 border-emerald-500/30"
-            actionText={t("panel.pkg.action")}
-          >
-            <PackagingViewport />
-          </FabricationPanel>
+            <FabricationPanel 
+              id_num="04"
+              title={t("panel.pkg.title")} 
+              filename="HexBox_250gsm.plt"
+              icon={LayoutTemplate}
+              accentColor="text-pack-accent"
+              accentBg="bg-emerald-900/20 border-emerald-500/30"
+              actionText={t("panel.pkg.action")}
+            >
+              <PackagingViewport />
+            </FabricationPanel>
 
-          <FabricationPanel 
-            id_num="05"
-            title={t("panel.pcb.title")} 
-            filename="Logic_Board_A.brd"
-            icon={Cpu}
-            accentColor="text-pack-accent"
-            accentBg="bg-emerald-900/20 border-emerald-500/30"
-            actionText={t("panel.pcb.action")}
-          >
-            <CircuitViewport />
-          </FabricationPanel>
+            <FabricationPanel 
+              id_num="05"
+              title={t("panel.pcb.title")} 
+              filename="Logic_Board_A.brd"
+              icon={Cpu}
+              accentColor="text-pack-accent"
+              accentBg="bg-emerald-900/20 border-emerald-500/30"
+              actionText={t("panel.pcb.action")}
+            >
+              <CircuitViewport />
+            </FabricationPanel>
 
-          <FabricationPanel 
-            id_num="06"
-            title={t("panel.bim.title")} 
-            filename="House_Parametric_V4.rvt"
-            icon={Home}
-            accentColor="text-orange-500"
-            accentBg="bg-orange-900/20 border-orange-500/30"
-            actionText={t("panel.bim.action")}
-          >
-            <BIMViewport />
-          </FabricationPanel>
+            <FabricationPanel 
+              id_num="06"
+              title={t("panel.bim.title")} 
+              filename="House_Parametric_V4.rvt"
+              icon={Home}
+              accentColor="text-orange-500"
+              accentBg="bg-orange-900/20 border-orange-500/30"
+              actionText={t("panel.bim.action")}
+            >
+              <BIMViewport />
+            </FabricationPanel>
+
+            <FabricationPanel 
+              id_num="07"
+              title={t("panel.pbr.title") || "PBR TEXTURING"} 
+              filename="Material_Library_V2.sbsar"
+              icon={Palette}
+              accentColor="text-purple-400"
+              accentBg="bg-purple-900/20 border-purple-500/30"
+              actionText={t("panel.pbr.action") || "APPLY MATERIAL"}
+            >
+              <PBRTexturingViewport />
+            </FabricationPanel>
+
+            <FabricationPanel 
+              id_num="08"
+              title={t("panel.tinker.title") || "ELECTRONICS SIM"} 
+              filename="IoT_Controller.ino"
+              icon={Zap}
+              accentColor="text-cyan-400"
+              accentBg="bg-cyan-900/20 border-cyan-500/30"
+              actionText={t("panel.tinker.action") || "UPLOAD FIRMWARE"}
+            >
+              <TinkercadViewport />
+            </FabricationPanel>
+
+            <FabricationPanel 
+              id_num="09"
+              title={t("panel.openscad.title") || "SCRIPTING CAD"} 
+              filename="Parametric_Bracket.scad"
+              icon={CodeSquare}
+              accentColor="text-yellow-500"
+              accentBg="bg-yellow-900/20 border-yellow-500/30"
+              actionText={t("panel.openscad.action") || "RENDER SCRIPT"}
+              className="xl:col-span-2"
+            >
+              <OpenSCADViewport />
+            </FabricationPanel>
+          </div>
         </main>
 
         {/* Footer Status Bar */}
