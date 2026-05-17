@@ -8,6 +8,17 @@ import { motion } from "motion/react";
 import { Home, Ruler, Layers, BoxSelect, ZoomIn, Upload, Download, FileUp, FileDown, CheckCircle2 } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 
+const getMaterialFeedRate = (material: string | undefined) => {
+  switch (material?.toLowerCase()) {
+    case 'pine': return 400;
+    case 'oak': return 200;
+    case 'walnut': return 250;
+    case 'maple': return 220;
+    case 'steel': return 50;
+    default: return 220;
+  }
+};
+
 export function BIMViewport() {
   const { t } = useI18n();
   const [isImporting, setIsImporting] = useState(false);
@@ -165,7 +176,7 @@ export function BIMViewport() {
               <PropertySection title={t("bim.cnc_path")} id="SYS">
                 <PropertyRow label={t("bim.tool")} value="Flat End 12mm" />
                 <PropertyRow label={t("bim.passes")} value={`${Math.ceil(selectedPart.length / 800)} x 12.5mm`} />
-                <PropertyRow label={t("bim.time")} value={`${(selectedPart.length / 220).toFixed(1)}m`} />
+                <PropertyRow label={t("bim.time")} value={`${((selectedPart.length / getMaterialFeedRate(selectedPart.material)) * Math.ceil(selectedPart.length / 800)).toFixed(1)}m`} />
               </PropertySection>
             )}
           </div>
@@ -201,53 +212,95 @@ export function BIMViewport() {
                {/* Abstract Architectural frame */}
                <g className="text-orange-500/80" fill="none" stroke="currentColor" strokeWidth="1">
                  {/* Main stud */}
-                 <motion.path 
-                   onClick={() => setSelectedPartId("S-201")}
-                   className={`cursor-pointer transition-colors ${selectedPartId === "S-201" ? "fill-orange-500/30 stroke-orange-500" : "fill-orange-500/10 stroke-orange-500/50 hover:fill-orange-500/20"}`}
-                   d="M 180 80 L 200 70 L 200 220 L 180 230 Z" 
-                   initial={{ opacity: 0, y: 10 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   transition={{ duration: 1 }}
-                 />
-                 <path d="M 200 70 L 220 80 L 220 230 L 200 220" opacity="0.5" pointerEvents="none" />
+                 {(() => {
+                   const stud = parts.find(p => p.id === "S-201");
+                   const l = stud ? stud.length / 16 : 150;
+                   const profileW = stud && stud.profile === "150x50mm" ? 30 : stud && stud.profile === "200x50mm" ? 40 : stud && stud.profile === "250x50mm" ? 50 : 20;
+                   return (
+                     <>
+                       <motion.path 
+                         onClick={() => setSelectedPartId("S-201")}
+                         className={`cursor-pointer transition-colors ${selectedPartId === "S-201" ? "fill-orange-500/30 stroke-orange-500" : "fill-orange-500/10 stroke-orange-500/50 hover:fill-orange-500/20"}`}
+                         d={`M 180 80 L ${180 + profileW} ${80 - profileW/2} L ${180 + profileW} ${80 - profileW/2 + l} L 180 ${80 + l} Z`} 
+                         initial={{ opacity: 0, y: 10 }}
+                         animate={{ opacity: 1, y: 0 }}
+                         transition={{ duration: 1 }}
+                       />
+                       <path d={`M ${180 + profileW} ${80 - profileW/2} L ${180 + profileW + 20} ${80 - profileW/2 + 10} L ${180 + profileW + 20} ${80 - profileW/2 + 10 + l} L ${180 + profileW} ${80 - profileW/2 + l}`} opacity="0.5" pointerEvents="none" />
+                     </>
+                   );
+                 })()}
                  
                  {/* Connecting beam (Custom Part) */}
-                 <motion.path 
-                   onClick={() => setSelectedPartId("B-104")}
-                   className={`cursor-pointer transition-colors ${selectedPartId === "B-104" ? "fill-orange-500/40 stroke-orange-400" : "fill-orange-500/20 stroke-orange-500/50 hover:fill-orange-500/30"}`}
-                   d="M 200 100 L 320 160 L 320 180 L 200 120 Z" 
-                   strokeWidth="1.5"
-                   initial={{ opacity: 0, scale: 0.95 }}
-                   animate={{ opacity: 1, scale: 1 }}
-                   transition={{ delay: 0.5, duration: 1 }}
-                 />
-                 <path d="M 320 160 L 340 150 L 340 170 L 320 180" opacity="0.5" pointerEvents="none" />
+                 {(() => {
+                   const beam = parts.find(p => p.id === "B-104");
+                   const l = beam ? beam.length / 26.66 : 120;
+                   const profileH = beam && beam.profile === "100x50mm" ? 13 : beam && beam.profile === "200x50mm" ? 26 : beam && beam.profile === "250x50mm" ? 33 : 20;
+                   return (
+                     <>
+                       <motion.path 
+                         onClick={() => setSelectedPartId("B-104")}
+                         className={`cursor-pointer transition-colors ${selectedPartId === "B-104" ? "fill-orange-500/40 stroke-orange-400" : "fill-orange-500/20 stroke-orange-500/50 hover:fill-orange-500/30"}`}
+                         d={`M 200 100 L ${200 + l} ${100 + l/2} L ${200 + l} ${100 + l/2 + profileH} L 200 ${100 + profileH} Z`} 
+                         strokeWidth="1.5"
+                         initial={{ opacity: 0, scale: 0.95 }}
+                         animate={{ opacity: 1, scale: 1 }}
+                         transition={{ delay: 0.5, duration: 1 }}
+                       />
+                       <path d={`M ${200 + l} ${100 + l/2} L ${200 + l + 20} ${100 + l/2 - 10} L ${200 + l + 20} ${100 + l/2 - 10 + profileH} L ${200 + l} ${100 + l/2 + profileH}`} opacity="0.5" pointerEvents="none" />
 
-                 {/* Cutting Tool Path Indicator */}
-                 <motion.path 
-                    d="M 200 105 L 315 162" 
-                    stroke="#fff" 
-                    strokeWidth="0.5" 
-                    strokeDasharray="2 2"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ delay: 1.5, duration: 2, repeat: Infinity }}
-                 />
+                       {/* Cutting Tool Path Indicator */}
+                       {selectedPartId === "B-104" && (
+                         <>
+                           <path 
+                              d={`M 200 105 L ${200 + l - 5} ${100 + l/2 + 2}`} 
+                              stroke="rgba(255, 255, 255, 0.2)" 
+                              strokeWidth="0.5" 
+                              strokeDasharray="2 2"
+                           />
+                           <motion.circle 
+                              r="1.5"
+                              fill="#fff"
+                              initial={{ cx: 200, cy: 105 }}
+                              animate={{ cx: 200 + l - 5, cy: 100 + l/2 + 2 }}
+                              transition={{ duration: 600 / getMaterialFeedRate(beam?.material), repeat: Infinity, ease: "linear" }}
+                           />
+                         </>
+                       )}
+                     </>
+                   );
+                 })()}
                </g>
 
                {/* Annotations */}
                <g className="text-orange-300 text-[6px] transition-all">
-                  <line x1="200" y1="110" x2="160" y2="110" stroke="currentColor" strokeWidth="0.5" />
-                  <text x="155" y="112" textAnchor="end" fill="currentColor">{parts.find(p => p.id === "B-104")?.id} ({t("bim." + (parts.find(p => p.id === "B-104")?.material?.toLowerCase() || "")) || parts.find(p => p.id === "B-104")?.material})</text>
+                  {(() => {
+                     const beam = parts.find(p => p.id === "B-104");
+                     const l = beam ? beam.length / 26.66 : 120;
+                     return (
+                       <>
+                         <line x1="200" y1="110" x2="160" y2="110" stroke="currentColor" strokeWidth="0.5" />
+                         <text x="155" y="112" textAnchor="end" fill="currentColor">{beam?.id} ({t("bim." + (beam?.material?.toLowerCase() || "")) || beam?.material})</text>
 
-                  <line x1="260" y1="130" x2="260" y2="100" stroke="currentColor" strokeWidth="0.5" />
-                  <text x="260" y="95" textAnchor="middle" fill="currentColor" className="font-bold">{parts.find(p => p.id === "B-104")?.length}mm</text>
+                         <line x1={200 + l/2} y1={100 + l/4 + 10} x2={200 + l/2} y2={100 + l/4 - 20} stroke="currentColor" strokeWidth="0.5" />
+                         <text x={200 + l/2} y={100 + l/4 - 25} textAnchor="middle" fill="currentColor" className="font-bold">{beam?.length}mm</text>
+                       </>
+                     );
+                  })()}
                   
-                  <line x1="190" y1="150" x2="140" y2="150" stroke="currentColor" strokeWidth="0.5" />
-                  <text x="135" y="152" textAnchor="end" fill="currentColor">{parts.find(p => p.id === "S-201")?.id} ({t("bim." + (parts.find(p => p.id === "S-201")?.material?.toLowerCase() || "")) || parts.find(p => p.id === "S-201")?.material})</text>
-                  
-                  <line x1="170" y1="80" x2="170" y2="230" stroke="currentColor" strokeWidth="0.5" />
-                  <text x="165" y="155" textAnchor="end" fill="currentColor" className="font-bold">{parts.find(p => p.id === "S-201")?.length}mm</text>
+                  {(() => {
+                     const stud = parts.find(p => p.id === "S-201");
+                     const l = stud ? stud.length / 16 : 150;
+                     return (
+                       <>
+                         <line x1="190" y1="150" x2="140" y2="150" stroke="currentColor" strokeWidth="0.5" />
+                         <text x="135" y="152" textAnchor="end" fill="currentColor">{stud?.id} ({t("bim." + (stud?.material?.toLowerCase() || "")) || stud?.material})</text>
+                         
+                         <line x1="170" y1="80" x2="170" y2={80 + l} stroke="currentColor" strokeWidth="0.5" />
+                         <text x="165" y={80 + l/2} textAnchor="end" fill="currentColor" className="font-bold">{stud?.length}mm</text>
+                       </>
+                     );
+                  })()}
                </g>
             </svg>
 
