@@ -15,8 +15,11 @@ import { CADViewport } from "./components/Viewports/CADViewport";
 import { CircuitViewport } from "./components/Viewports/CircuitViewport";
 import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu } from "lucide-react";
 import { cn } from "@/src/lib/utils";
+import { useI18n } from "./lib/i18n";
 
 export default function App() {
+  const { t } = useI18n();
+
   return (
     <div className="flex h-screen w-full bg-studio-bg overflow-hidden selection:bg-studio-accent/30 selection:text-studio-accent">
       <Sidebar />
@@ -27,72 +30,72 @@ export default function App() {
         <main className="flex-1 grid grid-cols-3 grid-rows-2 gap-[1px] bg-studio-grid overflow-hidden">
           <FabricationPanel 
             id_num="01"
-            title="CAD ENGINEERING" 
+            title={t("panel.cad.title")} 
             filename="Chassis_Parametric_V2.step"
             icon={Compass}
             accentColor="text-blue-400"
             accentBg="bg-blue-900/20 border-blue-500/30"
-            actionText="ENGINEERING PLAN"
+            actionText={t("panel.cad.action")}
           >
             <CADViewport />
           </FabricationPanel>
 
           <FabricationPanel 
             id_num="02"
-            title="3D PRECISION MESH" 
+            title={t("panel.3d.title")} 
             filename="Mesh_Gear_V9.stl"
             icon={Box}
             accentColor="text-3d-accent"
             accentBg="bg-blue-900/20 border-blue-500/30"
-            actionText="Export for Slicers (STL/OBJ)"
+            actionText={t("panel.3d.action")}
           >
             <ThreeDPrintingViewport />
           </FabricationPanel>
 
           <FabricationPanel 
             id_num="03"
-            title="PRECISION CNC ROUTER" 
+            title={t("panel.cnc.title")} 
             filename="Machining_Gcode_V1.nc"
             icon={Hammer}
             accentColor="text-wood-accent"
             accentBg="bg-amber-900/20 border-amber-500/30"
-            actionText="GENERATE G-CODE"
+            actionText={t("panel.cnc.action")}
           >
             <CNCRouterViewport />
           </FabricationPanel>
 
           <FabricationPanel 
             id_num="04"
-            title="DIE-CUT TEMPLATES" 
+            title={t("panel.pkg.title")} 
             filename="HexBox_250gsm.plt"
             icon={LayoutTemplate}
             accentColor="text-pack-accent"
             accentBg="bg-emerald-900/20 border-emerald-500/30"
-            actionText="Print & Cut Markers"
+            actionText={t("panel.pkg.action")}
           >
             <PackagingViewport />
           </FabricationPanel>
 
           <FabricationPanel 
             id_num="05"
-            title="ELECTRONICS & PCB" 
+            title={t("panel.pcb.title")} 
             filename="Logic_Board_A.brd"
             icon={Cpu}
             accentColor="text-pack-accent"
             accentBg="bg-emerald-900/20 border-emerald-500/30"
-            actionText="PCB AUDIT"
+            actionText={t("panel.pcb.action")}
           >
             <CircuitViewport />
           </FabricationPanel>
 
           <FabricationPanel 
             id_num="06"
-            title="BIM ARCHITECTURE" 
+            title={t("panel.bim.title")} 
             filename="House_Parametric_V4.rvt"
             icon={Home}
             accentColor="text-orange-500"
             accentBg="bg-orange-900/20 border-orange-500/30"
-            actionText="Extract Parts"
+            actionText={t("panel.bim.action")}
           >
             <BIMViewport />
           </FabricationPanel>

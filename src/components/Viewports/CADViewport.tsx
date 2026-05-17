@@ -6,15 +6,17 @@
 import React from "react";
 import { motion } from "motion/react";
 import { Ruler, Compass, Box, Layers, MousePointer2 } from "lucide-react";
+import { useI18n } from "../../lib/i18n";
 
 export function CADViewport() {
+  const { t } = useI18n();
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-blue-500/30">
       <div className="flex-1 bg-studio-bg rounded border border-white/5 relative flex gap-px bg-studio-grid min-h-0 overflow-hidden">
         {/* Parametric Tree */}
         <div className="w-24 bg-studio-panel/50 border-r border-studio-grid flex flex-col p-2 gap-1 shrink-0">
-          <span className="text-[7px] text-studio-muted uppercase font-black mb-1">Feature Tree</span>
-          <TreeItem name="Base_Sketch" icon={MousePointer2} active />
+          <span className="text-[7px] text-studio-muted uppercase font-black mb-1">{t("cad.tree")}</span>
+          <TreeItem name={t("cad.base_sketch")} icon={MousePointer2} active />
           <TreeItem name="Extrude_01" icon={Box} />
           <TreeItem name="Fillet_Core" icon={Compass} />
           <TreeItem name="Shell_V2" icon={Layers} />
@@ -63,7 +65,7 @@ export function CADViewport() {
 
            {/* View Cube */}
            <div className="absolute top-4 right-4 w-10 h-10 border border-studio-border bg-studio-panel/80 flex items-center justify-center text-[8px] font-bold text-studio-muted">
-             TOP
+             {t("cad.top")}
            </div>
         </div>
 

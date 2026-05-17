@@ -6,8 +6,10 @@
 import React from "react";
 import { motion } from "motion/react";
 import { Hammer, Zap, Play, Settings2, Activity } from "lucide-react";
+import { useI18n } from "../../lib/i18n";
 
 export function CNCRouterViewport() {
+  const { t } = useI18n();
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-amber-500/30">
       <div className="flex-1 bg-studio-bg rounded border border-white/5 relative p-4 flex gap-4 min-h-0 overflow-hidden">
@@ -49,8 +51,8 @@ export function CNCRouterViewport() {
            </svg>
 
            <div className="absolute top-2 left-2 flex gap-2">
-             <div className="px-1.5 py-0.5 bg-wood-accent/10 border border-wood-accent/30 text-[7px] text-wood-accent rounded uppercase font-bold">Tool: End Mill 1/4"</div>
-             <div className="px-1.5 py-0.5 bg-black/40 border border-white/10 text-[7px] text-white/60 rounded uppercase font-bold">Offset: Exterior</div>
+             <div className="px-1.5 py-0.5 bg-wood-accent/10 border border-wood-accent/30 text-[7px] text-wood-accent rounded uppercase font-bold">{t("cnc.tool")} 1/4"</div>
+             <div className="px-1.5 py-0.5 bg-black/40 border border-white/10 text-[7px] text-white/60 rounded uppercase font-bold">{t("cnc.offset")}</div>
            </div>
         </div>
         
@@ -58,7 +60,7 @@ export function CNCRouterViewport() {
         <div className="w-36 flex flex-col gap-2 shrink-0">
           <div className="p-2 bg-wood-accent/5 rounded border border-wood-accent/20 group hover:border-wood-accent/50 transition-colors">
             <div className="flex justify-between items-center mb-1">
-              <span className="text-[7px] text-wood-accent uppercase font-black">Spindle Load</span>
+              <span className="text-[7px] text-wood-accent uppercase font-black">{t("cnc.spindle")} Load</span>
               <Activity className="w-2 h-2 text-wood-accent animate-pulse" />
             </div>
             <div className="text-[12px] text-white font-black italic">18,500 <span className="text-[8px] font-normal not-italic opacity-40">RPM</span></div>
@@ -68,21 +70,21 @@ export function CNCRouterViewport() {
           </div>
 
           <div className="p-2 bg-black/20 rounded border border-white/5">
-            <div className="text-[7px] text-stone-500 uppercase font-black">Feed Rate</div>
+            <div className="text-[7px] text-stone-500 uppercase font-black">{t("cnc.feed")} Rate</div>
             <div className="text-[10px] text-white font-medium">4,200 <span className="text-[7px] opacity-40">mm/min</span></div>
           </div>
 
           <div className="p-2 bg-black/20 rounded border border-white/5">
-            <div className="text-[7px] text-stone-500 uppercase font-black">Plunge Rate</div>
+            <div className="text-[7px] text-stone-500 uppercase font-black">{t("cnc.plunge")}</div>
             <div className="text-[10px] text-white font-medium">800 <span className="text-[7px] opacity-40">mm/min</span></div>
           </div>
 
           <div className="mt-auto space-y-1">
              <button className="w-full flex items-center justify-between px-2 py-1.5 bg-wood-accent/10 border border-wood-accent/30 text-wood-accent hover:bg-wood-accent hover:text-white transition-all text-[8px] font-bold uppercase">
-               RUN JOB <Play className="w-2 h-2" />
+               {t("cnc.run_job")} <Play className="w-2 h-2" />
              </button>
              <button className="w-full flex items-center justify-between px-2 py-1 bg-studio-panel border border-studio-border text-stone-500 hover:text-white transition-all text-[8px] font-bold uppercase">
-               SETTINGS <Settings2 className="w-2 h-2" />
+               {t("nav.settings")} <Settings2 className="w-2 h-2" />
              </button>
           </div>
         </div>

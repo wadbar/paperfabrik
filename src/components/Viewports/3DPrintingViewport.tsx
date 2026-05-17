@@ -1,7 +1,9 @@
 import { Box, Download, Layers, Play, Settings } from "lucide-react";
 import { motion } from "motion/react";
+import { useI18n } from "../../lib/i18n";
 
 export function ThreeDPrintingViewport() {
+  const { t } = useI18n();
   return (
     <div className="flex h-full flex-col font-mono text-[11px]">
       <div className="flex-1 flex flex-col min-h-0">
@@ -36,7 +38,7 @@ export function ThreeDPrintingViewport() {
              <Layers className="w-6 h-6 text-studio-accent/40" />
           </div>
           <div className="flex-1">
-            <div className="text-[9px] font-bold mb-1 opacity-80 uppercase text-white">G-Code Preview Generation</div>
+            <div className="text-[9px] font-bold mb-1 opacity-80 uppercase text-white">{t("3d.gcode_gen")}</div>
             <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: "0%" }}
@@ -45,9 +47,9 @@ export function ThreeDPrintingViewport() {
               />
             </div>
             <div className="flex justify-between mt-1 text-[8px] font-mono opacity-50 uppercase">
-              <span>Layer 128/345</span>
-              <span>Support: Auto (Tree)</span>
-              <span>Infill: 20% Gyroid</span>
+              <span>{t("3d.layer")} 128/345</span>
+              <span>{t("3d.support")}</span>
+              <span>{t("3d.infill")}</span>
             </div>
           </div>
         </div>
