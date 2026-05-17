@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-studio-bg: #050505;
+  --color-studio-panel: #0d0d0f;
+  --color-studio-border: #262629;
+  --color-studio-grid: #1f1f23;
+  --color-studio-accent: #2563eb;
+  --color-studio-text: #d1d5db;
+  --color-studio-muted: #6b7280;
+  
+  --color-3d-accent: #3b82f6;
+  --color-wood-accent: #f59e0b;
+  --color-pack-accent: #10b981;
+  --color-apparel-accent: #d946ef;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-studio-bg);
+    color: var(--color-studio-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-studio-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-studio-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-studio-muted);
+}
