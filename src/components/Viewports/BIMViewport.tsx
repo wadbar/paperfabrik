@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Home, Ruler, Layers, BoxSelect, ZoomIn, Upload, Download, FileUp, FileDown, CheckCircle2 } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
+import { useTelemetry } from "../../hooks/useTelemetry";
 
 const getMaterialFeedRate = (material: string | undefined) => {
   switch (material?.toLowerCase()) {
@@ -21,6 +22,7 @@ const getMaterialFeedRate = (material: string | undefined) => {
 
 export function BIMViewport() {
   const { t } = useI18n();
+  const { recordEvent } = useTelemetry("BIMViewport");
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [fileStatus, setFileStatus] = useState<string | null>(null);
@@ -36,6 +38,9 @@ export function BIMViewport() {
   const updateSelectedPart = (updates: Partial<typeof parts[0]>) => {
     if (!selectedPartId) return;
     setParts(parts.map(p => p.id === selectedPartId ? { ...p, ...updates } : p));
+    if (updates.material) {
+      recordEvent("PART_MATERIAL_CHANGED", { partId: selectedPartId, material: updates.material });
+    }
   };
   
   const [isCncProcessing, setIsCncProcessing] = useState(false);

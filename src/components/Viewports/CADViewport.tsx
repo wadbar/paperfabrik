@@ -47,6 +47,15 @@ export function CADViewport() {
     recordEvent("RENDER_SETTINGS_OPENED");
   };
 
+  const currentStrokeWidth = useMemo(() => {
+    switch (savedSettings.resolution) {
+      case 'Low': return 1.5;
+      case 'Medium': return 1.0;
+      case 'High': return 0.5;
+      default: return 1.0;
+    }
+  }, [savedSettings.resolution]);
+
   const polygonPath = useMemo(() => {
     let d = "";
     for (let i = 0; i < sides; i++) {
@@ -126,7 +135,11 @@ export function CADViewport() {
            {/* Technical Grid Overlay */}
            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
            
-           <svg className="w-full h-full text-blue-400" viewBox="0 0 200 200">
+           <svg 
+             className="w-full h-full text-blue-400" 
+             viewBox="0 0 200 200"
+             shapeRendering={savedSettings.antiAliasing ? "auto" : "crispEdges"}
+           >
              {/* Origin/Axes */}
              <g className="opacity-40">
                <path d="M100 20 L100 180 M20 100 L180 100" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="2 2" />
@@ -135,12 +148,12 @@ export function CADViewport() {
 
              {/* Sketch Base */}
              <g className="text-blue-500/30">
-               <path d={polygonPath} fill="none" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 1" />
+               <path d={polygonPath} fill="none" stroke="currentColor" strokeWidth={currentStrokeWidth * 0.5} strokeDasharray="1 1" />
              </g>
 
              {/* Extrusion lines */}
              <g className="text-blue-400/50">
-                <path d={extrudePath} stroke="currentColor" strokeWidth="1" fill="none" />
+                <path d={extrudePath} stroke="currentColor" strokeWidth={currentStrokeWidth} fill="none" />
              </g>
 
              {/* Top Solid Face */}
@@ -149,7 +162,7 @@ export function CADViewport() {
                  d={topPolygonPath} 
                  fill="rgba(59,130,246,0.1)" 
                  stroke="currentColor" 
-                 strokeWidth="1.5"
+                 strokeWidth={currentStrokeWidth * 1.5}
                  initial={{ opacity: 0 }}
                  animate={{ opacity: 1 }}
                />
@@ -200,7 +213,7 @@ export function CADViewport() {
                    <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between bg-white/5">
                      <div className="flex items-center gap-2">
                        <Settings2 className="w-4 h-4 text-blue-400" />
-                       <span className="font-black text-[9px] uppercase tracking-widest text-white/90">Render Settings</span>
+                       <span className="font-black text-[9px] uppercase tracking-widest text-white/90">{t("cad.render_settings")}</span>
                      </div>
                      <button 
                        onClick={() => setIsSettingsOpen(false)}
@@ -215,8 +228,8 @@ export function CADViewport() {
                      {/* Resolution Slider */}
                      <div className="space-y-3">
                        <div className="flex justify-between items-center text-[8px] uppercase tracking-tighter">
-                         <span className="text-white/50">Output Resolution</span>
-                         <span className="text-blue-400 font-bold">{tempSettings.resolution}</span>
+                         <span className="text-white/50">{t("cad.resolution") || "Output Resolution"}</span>
+                         <span className="text-blue-400 font-bold">{t(`cad.resolution_${tempSettings.resolution.toLowerCase()}`)}</span>
                        </div>
                        <div className="relative pt-4">
                          <input 
@@ -232,9 +245,9 @@ export function CADViewport() {
                            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
                          />
                          <div className="flex justify-between px-1 mt-2 text-[7px] text-white/30 uppercase">
-                           <span>Low</span>
-                           <span>Med</span>
-                           <span>High</span>
+                           <span>{t("cad.resolution_low")}</span>
+                           <span>{t("cad.resolution_medium")}</span>
+                           <span>{t("cad.resolution_high")}</span>
                          </div>
                        </div>
                      </div>
@@ -242,8 +255,8 @@ export function CADViewport() {
                      {/* Anti-Aliasing Toggle */}
                      <div className="flex items-center justify-between group">
                        <div className="flex flex-col gap-0.5">
-                         <span className="text-[8px] uppercase tracking-tighter text-white/50">Anti-Aliasing</span>
-                         <span className="text-[7px] text-white/30">Smooth vector rendering</span>
+                         <span className="text-[8px] uppercase tracking-tighter text-white/50">{t("cad.anti_aliasing") || "Anti-Aliasing"}</span>
+                         <span className="text-[7px] text-white/30">{t("cad.anti_aliasing_desc") || "Smooth vector rendering"}</span>
                        </div>
                        <label className="relative inline-flex items-center cursor-pointer">
                          <input 
@@ -258,16 +271,16 @@ export function CADViewport() {
 
                      {/* Output Format Dropdown */}
                      <div className="space-y-2">
-                       <span className="text-[8px] uppercase tracking-tighter text-white/50">Export Format</span>
+                       <span className="text-[8px] uppercase tracking-tighter text-white/50">{t("cad.export_format") || "Export Format"}</span>
                        <div className="relative group">
                          <select 
                            value={tempSettings.outputFormat}
                            onChange={(e) => setTempSettings({...tempSettings, outputFormat: e.target.value as any})}
                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-[9px] text-white appearance-none focus:outline-none focus:border-blue-500/50 transition-colors"
                          >
-                           <option value="PNG" className="bg-[#0a0a0b]">PNG Image (.png)</option>
-                           <option value="JPG" className="bg-[#0a0a0b]">JPEG Image (.jpg)</option>
-                           <option value="STL" className="bg-[#0a0a0b]">STL Mesh (.stl)</option>
+                           <option value="PNG" className="bg-[#0a0a0b]">{t("cad.format_png")}</option>
+                           <option value="JPG" className="bg-[#0a0a0b]">{t("cad.format_jpg")}</option>
+                           <option value="STL" className="bg-[#0a0a0b]">{t("cad.format_stl")}</option>
                          </select>
                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30 pointer-events-none group-hover:text-white/60 transition-colors" />
                        </div>
@@ -280,13 +293,13 @@ export function CADViewport() {
                        onClick={() => setIsSettingsOpen(false)}
                        className="flex-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-[9px] uppercase font-bold text-white/60 hover:bg-white/10 hover:text-white transition-all shadow-sm"
                      >
-                       Cancel
+                       {t("cad.cancel") || "Cancel"}
                      </button>
                      <button 
                        onClick={handleSaveSettings}
                        className="flex-1 px-3 py-2 rounded bg-blue-600 border border-blue-500 text-[9px] uppercase font-bold text-white hover:bg-blue-500 transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] flex items-center justify-center gap-1.5"
                      >
-                       <Check className="w-3 h-3" /> Save Changes
+                       <Check className="w-3 h-3" /> {t("cad.save") || "Save"}
                      </button>
                    </div>
                  </motion.div>
