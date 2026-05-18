@@ -2,9 +2,11 @@ import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Code, Play, Save, Box, CornerRightDown } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
+import { useTelemetry } from "../../hooks/useTelemetry";
 
 export function OpenSCADViewport() {
   const { t } = useI18n();
+  const { recordEvent } = useTelemetry("OpenSCAD");
   const [code, setCode] = useState(`// OpenSCAD style script
 difference() {
     cube([30, 30, 30], center=true);
@@ -18,10 +20,12 @@ difference() {
   const handleCompile = () => {
     setIsCompiling(true);
     setCompileLog("Compiling CSG tree...");
+    recordEvent("SCAD_COMPILE_START", { scriptLength: code.length });
     setTimeout(() => {
       setCompiled(code);
       setIsCompiling(false);
       setCompileLog("Compile finished successfully. 2 volumes, 1 boolean operation.");
+      recordEvent("SCAD_COMPILE_SUCCESS");
     }, 600);
   };
 

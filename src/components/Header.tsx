@@ -1,7 +1,7 @@
-import { Activity, Bell, ChevronDown, Monitor, Search, Share2, Globe } from "lucide-react";
+import { Activity, Bell, ChevronDown, Monitor, Search, Share2, Globe, Brain } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
-export function Header() {
+export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
   const { language, setLanguage, t } = useI18n();
 
   const toggleLanguage = () => {
@@ -28,6 +28,14 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4 text-[10px] uppercase tracking-widest font-bold">
+        <button 
+           onClick={onOpenAI}
+           className="flex items-center gap-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-md border border-purple-500/20 transition-all group"
+        >
+          <Brain className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+          <span>AI KERNEL</span>
+        </button>
+
         <button 
           onClick={toggleLanguage}
           className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity"

@@ -69,6 +69,7 @@ export const translations: TranslationDictionary = {
   "cad.anti_aliasing": { en: "Anti-Aliasing", pt: "Anti-Serrilhado" },
   "cad.anti_aliasing_desc": { en: "Smooth vector rendering", pt: "Suavização de vetores" },
   "cad.export_format": { en: "Export Format", pt: "Formato de Exportação" },
+  "cad.export": { en: "Export Design", pt: "Exportar Design" },
   "cad.cancel": { en: "Cancel", pt: "Cancelar" },
   "cad.save": { en: "Save", pt: "Salvar" },
   "cad.oak": { en: "Oak", pt: "Carvalho" },
@@ -84,6 +85,28 @@ export const translations: TranslationDictionary = {
   "cad.format_stl": { en: "STL Mesh (.stl)", pt: "Malha STL (.stl)" },
   "cad.base_sketch": { en: "Base_Sketch", pt: "Esboço_Base" },
   "cad.top": { en: "TOP", pt: "TOPO" },
+
+  // Photogrammetry Keys
+  "photo.title": { en: "Photogrammetry Engine", pt: "Motor de Fotogrametria" },
+  "photo.camera_alignment": { en: "Camera Alignment", pt: "Alinhamento de Câmera" },
+  "photo.feature_extraction": { en: "Feature Extraction", pt: "Extração de Características" },
+  "photo.structure_from_motion": { en: "Structure from Motion", pt: "Estrutura por Movimento" },
+  "photo.meshing": { en: "Depth Map & Meshing", pt: "Mapa de Profundidade e Malha" },
+  "photo.total_points": { en: "Total Points", pt: "Total de Pontos" },
+  "photo.reprojection_error": { en: "Reprojection Error", pt: "Erro de Reprojeção" },
+  "photo.processing_node": { en: "Processing Node", pt: "Nodo de Processamento" },
+  "photo.status_idle": { en: "Idle", pt: "Ocioso" },
+  "photo.status_running": { en: "Processing", pt: "Processando" },
+  "photo.status_success": { en: "Success", pt: "Sucesso" },
+  "photo.status_error": { en: "Failure", pt: "Falha" },
+
+  // Simulation Keys
+  "sim.title": { en: "Structural Analysis", pt: "Análise Estrutural" },
+  "sim.run": { en: "Run Load Simulation", pt: "Executar Simulação de Carga" },
+  "sim.peak_stress": { en: "Peak Stress", pt: "Estresse de Pico" },
+  "sim.safety_factor": { en: "Safety Factor", pt: "Fator de Segurança" },
+  "sim.deformation": { en: "Deformation", pt: "Deformação" },
+  "sim.status_solving": { en: "Solving Matrix...", pt: "Resolvendo Matriz..." },
 
   "3d.printing": { en: "PRINTING", pt: "IMPRESSÃO" },
   "3d.layer": { en: "Layer", pt: "Camada" },

@@ -1,6 +1,6 @@
 {
   "name": "Paper Fabrik",
-  "description": "An advanced digital fabrication studio for 3D printing, CNC, laser cutting, and design fabrication.",
+  "description": "An advanced digital fabrication studio for 3D printing, CNC, photogrammetry, and parametric CAD engineering.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

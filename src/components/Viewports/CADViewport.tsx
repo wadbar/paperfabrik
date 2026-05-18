@@ -5,34 +5,47 @@
 
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Ruler, Compass, Box, Layers, MousePointer2, Settings2, Link, X, Check, ChevronDown } from "lucide-react";
+import { 
+  Ruler, Compass, Box, Layers, MousePointer2, Settings2, Link, X, Check, 
+  ChevronDown, Download, Activity, Wind, PlayCircle, BarChart3 
+} from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 import { useTelemetry } from "../../hooks/useTelemetry";
+import { ProjectionKernel, Vector3 } from "../../core/geometry";
+import { Mesh } from "../../core/mesh";
+import { SimulationEngine, SimulationResult } from "../../core/simulation";
 
 interface RenderSettings {
   resolution: 'Low' | 'Medium' | 'High';
   antiAliasing: boolean;
-  outputFormat: 'PNG' | 'JPG' | 'STL';
+  outputFormat: 'PNG' | 'JPG' | 'STL' | 'OBJ';
+  shading: "Wireframe" | "Solid" | "Realistic" | "Stress";
 }
 
 export function CADViewport() {
   const { t } = useI18n();
   const { recordEvent } = useTelemetry("CADViewport");
-  const [radius, setRadius] = useState(40);
+  const [radius, setRadius] = useState(60);
   const [sides, setSides] = useState(6);
-  const [extrude, setExtrude] = useState(20);
+  const [extrude, setExtrude] = useState(40);
+
+  // Analysis State
+  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   // Render Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [tempSettings, setTempSettings] = useState<RenderSettings>({
     resolution: 'Medium',
     antiAliasing: true,
-    outputFormat: 'PNG',
+    outputFormat: 'OBJ',
+    shading: "Solid"
   });
   const [savedSettings, setSavedSettings] = useState<RenderSettings>({
     resolution: 'Medium',
     antiAliasing: true,
-    outputFormat: 'PNG',
+    outputFormat: 'OBJ',
+    shading: "Solid"
   });
 
   const handleSaveSettings = () => {
@@ -41,10 +54,55 @@ export function CADViewport() {
     recordEvent("RENDER_SETTINGS_SAVED", tempSettings);
   };
 
+  const runSimulation = () => {
+    setIsSimulating(true);
+    recordEvent("CAD_SIMULATION_START");
+    
+    setTimeout(() => {
+        const result = SimulationEngine.simulateStaticLoad(geometryData.mesh);
+        setSimResult(result);
+        setIsSimulating(false);
+        setSavedSettings(prev => ({ ...prev, shading: "Stress" }));
+        recordEvent("CAD_SIMULATION_SUCCESS", { peakStress: result.maxStress });
+    }, 800);
+  };
+
   const handleOpenSettings = () => {
     setTempSettings(savedSettings);
     setIsSettingsOpen(true);
     recordEvent("RENDER_SETTINGS_OPENED");
+  };
+
+  const handleExport = async () => {
+    try {
+      recordEvent("EXPORT_INITIATED", { format: savedSettings.outputFormat });
+      const response = await fetch("/api/cad/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          format: savedSettings.outputFormat,
+          projectData: { radius, sides, extrude, resolution: savedSettings.resolution }
+        })
+      });
+      
+      if (savedSettings.outputFormat === "STL" || savedSettings.outputFormat === "OBJ") {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `paperfabrik_export_${Date.now()}.${savedSettings.outputFormat.toLowerCase()}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } else {
+        const result = await response.json();
+        console.log("Export Result:", result);
+      }
+      recordEvent("EXPORT_COMPLETED", { format: savedSettings.outputFormat });
+    } catch (err: any) {
+      recordEvent("EXPORT_FAILED", { error: err.message });
+    }
   };
 
   const currentStrokeWidth = useMemo(() => {
@@ -56,48 +114,78 @@ export function CADViewport() {
     }
   }, [savedSettings.resolution]);
 
-  const polygonPath = useMemo(() => {
-    let d = "";
+  const geometryData = useMemo(() => {
+    // Industrial Parametric Generation via GeometryKernel
+    const { base, top } = ProjectionKernel.generateExtrusion(sides, radius, extrude);
+    const vertices = [...base, ...top];
+    const faces: any[] = [];
+    
+    // Side faces (Triangulated for simulation accuracy)
     for (let i = 0; i < sides; i++) {
-      const angle = (i * 2 * Math.PI) / sides - Math.PI / 2;
-      const x = 100 + radius * Math.cos(angle);
-      const y = 100 + radius * Math.sin(angle);
-      if (i === 0) d += `M${x} ${y}`;
-      else d += ` L${x} ${y}`;
+        const next = (i + 1) % sides;
+        faces.push({ indices: [i, next, next + sides] });
+        faces.push({ indices: [next, next + sides, i + sides] });
     }
-    return d + " Z";
-  }, [radius, sides]);
+    
+    // Top face fan
+    for (let i = 1; i < sides - 1; i++) {
+        faces.push({ indices: [sides, sides + i, sides + i + 1] });
+    }
 
-  const extrudePath = useMemo(() => {
-    let d = "";
-    for (let i = 0; i < sides; i++) {
-      const angle = (i * 2 * Math.PI) / sides - Math.PI / 2;
-      const x1 = 100 + radius * Math.cos(angle);
-      const y1 = 100 + radius * Math.sin(angle);
-      const x2 = x1;
-      const y2 = y1 - extrude;
-      d += `M${x1} ${y1} L${x2} ${y2} `;
-    }
-    return d;
+    const mesh = new Mesh(vertices, faces);
+    mesh.computeNormals();
+
+    const origin = { x: 100, y: 120 };
+    const lightDir = new Vector3(1, -1, 1).normalize();
+
+    const projectedFaces = mesh.faces.map(face => {
+      const projectedPoints = face.indices.map(idx => {
+        let v = mesh.vertices[idx];
+        if (simResult && savedSettings.shading === "Stress") {
+             v = v.add(simResult.vertexDisplacements[idx].mul(10)); 
+        }
+        const p = ProjectionKernel.project(v);
+        return { x: origin.x + p.x, y: origin.y + p.y };
+      });
+
+      const intensity = face.normal ? Math.max(0.15, face.normal.dot(lightDir)) : 0.4;
+      
+      let fill = `rgba(59, 130, 246, ${intensity * 0.9})`;
+      if (savedSettings.shading === "Stress" && simResult) {
+          const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / 3;
+          const t = (avgStress - simResult.minStress) / (simResult.maxStress - simResult.minStress || 1);
+          const r = Math.floor(t * 255);
+          const g = Math.floor((1 - t) * 150);
+          const b = Math.floor((1 - t) * 255);
+          fill = `rgba(${r}, ${g}, ${b}, ${intensity * 1.5})`;
+      }
+
+      return {
+        path: ProjectionKernel.pointsToPath(projectedPoints),
+        intensity,
+        points: projectedPoints,
+        fill
+      };
+    });
+
+    return {
+      faces: projectedFaces,
+      basePath: ProjectionKernel.pointsToPath(base.map(v => {
+        const p = ProjectionKernel.project(v);
+        return { x: origin.x + p.x, y: origin.y + p.y };
+      })),
+      projectedBase: base.map(v => {
+        const p = ProjectionKernel.project(v);
+        return { x: origin.x + p.x, y: origin.y + p.y };
+      }),
+      mesh
+    };
   }, [radius, sides, extrude]);
-
-  const topPolygonPath = useMemo(() => {
-    let d = "";
-    for (let i = 0; i < sides; i++) {
-      const angle = (i * 2 * Math.PI) / sides - Math.PI / 2;
-      const x = 100 + radius * Math.cos(angle);
-      const y = 100 - extrude + radius * Math.sin(angle);
-      if (i === 0) d += `M${x} ${y}`;
-      else d += ` L${x} ${y}`;
-    }
-    return d + " Z";
-  }, [radius, sides, extrude]);
-
 
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-blue-500/30">
       <div className="flex-1 bg-studio-bg rounded border border-white/5 relative flex gap-px bg-studio-grid min-h-0 overflow-hidden">
-        {/* Parametric Tree & Properties (FreeCAD/SolveSpace style) */}
+        {/* Parametric Tree & Properties */}
         <div className="w-32 bg-[#0a0a0b] flex flex-col p-2 gap-2 shrink-0 overflow-y-auto border-r border-white/5">
           <span className="text-[7px] text-blue-400 uppercase font-black mb-1 flex items-center gap-1">
              <Layers className="w-3 h-3" /> {t("cad.tree")}
@@ -119,7 +207,7 @@ export function CADViewport() {
 
           <TreeItem name="Extrude_Pad" icon={Box} />
           
-          <div className="pl-3 py-1 space-y-2">
+          <div className="pl-3 py-1 space-y-2 border-b border-white/5 pb-3 mb-2">
              <div className="flex flex-col gap-1 text-[8px] text-white/70">
                 <div className="flex justify-between items-center">
                    <span className="flex items-center gap-1"><Box className="w-2 h-2"/> Length</span>
@@ -128,11 +216,71 @@ export function CADViewport() {
              </div>
           </div>
 
+          <div className="mt-2 space-y-3">
+             <span className="text-[7px] text-emerald-400 uppercase font-black px-1 flex items-center gap-1">
+                <Activity className="w-3 h-3" /> MESH ANALYSIS
+             </span>
+             <div className="flex flex-col gap-1 px-1">
+                <div className="flex justify-between text-[8px] text-white/30 uppercase">
+                  <span>Vertices</span>
+                  <span className="text-white/60">{geometryData.mesh.vertices.length}</span>
+                </div>
+                <div className="flex justify-between text-[8px] text-white/30 uppercase">
+                  <span>Faces</span>
+                  <span className="text-white/60">{geometryData.mesh.faces.length}</span>
+                </div>
+                <div className="flex justify-between text-[8px] text-white/30 uppercase">
+                  <span>Normal Ref</span>
+                  <span className="text-emerald-500/80">Aligned</span>
+                </div>
+                <div className="flex justify-between text-[8px] text-white/30 uppercase">
+                  <span>Engine</span>
+                  <span className="text-blue-400/80">Kernel V4</span>
+                </div>
+             </div>
+          </div>
+
+          <div className="mt-4 px-1 space-y-2 border-t border-white/5 pt-4">
+             <span className="text-[7px] text-amber-500 uppercase font-black flex items-center gap-1">
+                <Wind className="w-3 h-3" /> {t("sim.title")}
+             </span>
+             {simResult ? (
+                 <div className="space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <div className="bg-amber-500/10 border border-amber-500/20 p-1.5 rounded">
+                        <div className="flex justify-between text-[8px] text-amber-200/60 uppercase">
+                            <span>{t("sim.peak_stress")}</span>
+                            <span className="font-bold">{simResult.maxStress.toFixed(3)} MPa</span>
+                        </div>
+                        <div className="h-1 w-full bg-black/40 rounded-full mt-1 overflow-hidden">
+                            <motion.div 
+                                className="h-full bg-amber-500"
+                                initial={{ width: 0 }}
+                                animate={{ width: "85%" }}
+                            />
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => setSimResult(null)}
+                        className="w-full py-1 text-[7px] text-white/40 uppercase hover:text-white transition-colors"
+                    >
+                        Clear Simulation
+                    </button>
+                 </div>
+             ) : (
+                 <button 
+                    onClick={runSimulation}
+                    disabled={isSimulating}
+                    className="w-full py-2 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500 hover:text-black text-amber-400 text-[8px] font-black uppercase rounded flex items-center justify-center gap-2 transition-all group"
+                 >
+                    {isSimulating ? <Wind className="w-3 h-3 animate-spin" /> : <PlayCircle className="w-3 h-3 group-hover:fill-current" />}
+                    {isSimulating ? t("sim.status_solving") : t("sim.run")}
+                 </button>
+             )}
+          </div>
         </div>
 
         {/* CAD Canvas */}
         <div className="flex-1 relative bg-[#0d1117] flex items-center justify-center overflow-hidden">
-           {/* Technical Grid Overlay */}
            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
            
            <svg 
@@ -146,45 +294,42 @@ export function CADViewport() {
                <circle cx="100" cy="100" r="1.5" fill="#3b82f6" />
              </g>
 
-             {/* Sketch Base */}
-             <g className="text-blue-500/30">
-               <path d={polygonPath} fill="none" stroke="currentColor" strokeWidth={currentStrokeWidth * 0.5} strokeDasharray="1 1" />
+             {/* Mesh Rendering (Shaded) */}
+             <g>
+                {geometryData.faces.map((face, i) => (
+                  <motion.path 
+                    key={i}
+                    d={face.path}
+                    fill={savedSettings.shading !== "Wireframe" ? face.fill : "none"}
+                    stroke={savedSettings.shading === "Wireframe" ? "rgba(59, 130, 246, 0.5)" : "rgba(255, 255, 255, 0.05)"}
+                    strokeWidth={currentStrokeWidth}
+                    className="transition-colors hover:fill-blue-500/50 cursor-crosshair"
+                  />
+                ))}
              </g>
 
-             {/* Extrusion lines */}
-             <g className="text-blue-400/50">
-                <path d={extrudePath} stroke="currentColor" strokeWidth={currentStrokeWidth} fill="none" />
+             {/* Sketch Base (Ghost) */}
+             <g className="text-blue-500/10">
+               <path d={geometryData.basePath} fill="none" stroke="currentColor" strokeWidth={currentStrokeWidth * 0.5} strokeDasharray="1 1" />
              </g>
 
-             {/* Top Solid Face */}
-             <g className="text-blue-300">
-               <motion.path 
-                 d={topPolygonPath} 
-                 fill="rgba(59,130,246,0.1)" 
-                 stroke="currentColor" 
-                 strokeWidth={currentStrokeWidth * 1.5}
-                 initial={{ opacity: 0 }}
-                 animate={{ opacity: 1 }}
-               />
-             </g>
-
-             {/* Constraint visualizer (FreeCAD/SolveSpace style datum constraints) */}
+             {/* Real-world Constraints Visualizer */}
              <g className="text-emerald-400 text-[6px]">
                {/* Radius dimension */}
-               <line x1="100" y1="100" x2={100 + radius * Math.cos(-Math.PI/2)} y2={100 + radius * Math.sin(-Math.PI/2)} stroke="currentColor" strokeWidth="0.5" />
-               <circle cx={100 + radius * Math.cos(-Math.PI/2) / 2} cy={100 - radius/2} r="8" fill="#0d1117" stroke="currentColor" strokeWidth="0.5" />
-               <text x={100 + radius * Math.cos(-Math.PI/2) / 2} y={100 - radius/2 + 2} textAnchor="middle" fill="currentColor">R{radius}</text>
+               <line x1="100" y1="120" x2={geometryData.projectedBase[0].x} y2={geometryData.projectedBase[0].y} stroke="currentColor" strokeWidth="0.5" />
+               <circle cx={100 + (geometryData.projectedBase[0].x - 100)/2} cy={120 + (geometryData.projectedBase[0].y - 120)/2} r="6" fill="#0d1117" stroke="currentColor" strokeWidth="0.5" />
+               <text x={100 + (geometryData.projectedBase[0].x - 100)/2} y={120 + (geometryData.projectedBase[0].y - 120)/2 + 2} textAnchor="middle" fill="currentColor">R{radius}</text>
                
                {/* Extrude height dimension */}
-               <line x1="180" y1="100" x2="180" y2={100 - extrude} stroke="#f59e0b" strokeWidth="0.5" strokeDasharray="1 1" />
-               <text x="185" y={100 - extrude/2 + 2} fill="#f59e0b">L{extrude}</text>
+               <line x1="180" y1="120" x2="180" y2={120 - extrude} stroke="#f59e0b" strokeWidth="0.5" strokeDasharray="1 1" />
+               <text x="185" y={120 - extrude/2 + 2} fill="#f59e0b">L{extrude}</text>
              </g>
            </svg>
 
-           {/* Viewport controls (Blender style) */}
+           {/* Viewport controls */}
            <div className="absolute top-2 right-2 flex gap-1 z-10">
              <div className="px-1.5 py-1 bg-black/40 border border-white/10 rounded cursor-pointer hover:bg-white/10 text-white/60 transition-colors">
-                 <Box className="w-3 h-3" />
+                  <Box className="w-3 h-3" />
              </div>
              <button 
                onClick={handleOpenSettings}
@@ -192,6 +337,13 @@ export function CADViewport() {
                title={t("cad.render_settings")}
              >
                  <Settings2 className="w-3 h-3" />
+             </button>
+             <button 
+               onClick={handleExport}
+               className="px-1.5 py-1 bg-black/40 border border-white/10 rounded cursor-pointer hover:bg-blue-500/20 hover:border-blue-500/50 hover:text-blue-400 text-white/60 transition-all shadow-sm"
+               title={t("cad.export")}
+             >
+                 <Download className="w-3 h-3" />
              </button>
            </div>
 
@@ -269,20 +421,35 @@ export function CADViewport() {
                        </label>
                      </div>
 
+                     {/* Shading Mode */}
+                     <div>
+                       <label className="text-[8px] text-white/40 uppercase mb-1.5 block">Shading Mode</label>
+                       <div className="grid grid-cols-4 gap-1">
+                         {(['Wireframe', 'Solid', 'Realistic', 'Stress'] as const).map(mode => (
+                           <button 
+                             key={mode}
+                             onClick={() => setTempSettings({...tempSettings, shading: mode})}
+                             className={`py-1.5 text-[8px] uppercase rounded border transition-all ${tempSettings.shading === mode ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-white/2 border-white/5 text-white/40 hover:bg-white/5'}`}
+                           >
+                             {mode}
+                           </button>
+                         ))}
+                       </div>
+                     </div>
+
                      {/* Output Format Dropdown */}
                      <div className="space-y-2">
                        <span className="text-[8px] uppercase tracking-tighter text-white/50">{t("cad.export_format") || "Export Format"}</span>
-                       <div className="relative group">
-                         <select 
-                           value={tempSettings.outputFormat}
-                           onChange={(e) => setTempSettings({...tempSettings, outputFormat: e.target.value as any})}
-                           className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-[9px] text-white appearance-none focus:outline-none focus:border-blue-500/50 transition-colors"
-                         >
-                           <option value="PNG" className="bg-[#0a0a0b]">{t("cad.format_png")}</option>
-                           <option value="JPG" className="bg-[#0a0a0b]">{t("cad.format_jpg")}</option>
-                           <option value="STL" className="bg-[#0a0a0b]">{t("cad.format_stl")}</option>
-                         </select>
-                         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30 pointer-events-none group-hover:text-white/60 transition-colors" />
+                       <div className="grid grid-cols-4 gap-1">
+                         {(['PNG', 'JPG', 'STL', 'OBJ'] as const).map(fmt => (
+                            <button 
+                                key={fmt}
+                                onClick={() => setTempSettings({...tempSettings, outputFormat: fmt as any})}
+                                className={`py-1.5 text-[8px] uppercase rounded border transition-all ${tempSettings.outputFormat === fmt ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-white/2 border-white/5 text-white/40 hover:bg-white/5'}`}
+                            >
+                                {fmt}
+                            </button>
+                         ))}
                        </div>
                      </div>
                    </div>

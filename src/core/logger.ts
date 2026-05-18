@@ -76,6 +76,21 @@ class Logger {
       "color: inherit;",
       metadata || ""
     );
+
+    // Sync with server in non-interactive background
+    this.syncWithServer([entry]);
+  }
+
+  private async syncWithServer(entries: LogEntry[]) {
+    try {
+      await fetch("/api/telemetry/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logs: entries }),
+      });
+    } catch (err) {
+      // Fail silently to avoid infinite recursion or blocking UI
+    }
   }
 
   private getLogColor(level: LogLevel): string {

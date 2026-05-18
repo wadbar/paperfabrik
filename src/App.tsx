@@ -7,6 +7,9 @@ import React, { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { FabricationPanel } from "./components/FabricationPanel";
+import { TerminalOverlay } from "./components/TerminalOverlay";
+import { AIChatPanel } from "./components/AIChatPanel";
+import { SystemHealthMonitor } from "./components/SystemHealthMonitor";
 import { ThreeDPrintingViewport } from "./components/Viewports/3DPrintingViewport";
 import { CNCRouterViewport } from "./components/Viewports/CNCRouterViewport";
 import { PackagingViewport } from "./components/Viewports/PackagingViewport";
@@ -17,7 +20,8 @@ import { PBRTexturingViewport } from "./components/Viewports/PBRTexturingViewpor
 import { TinkercadViewport } from "./components/Viewports/TinkercadViewport";
 import { OpenSCADViewport } from "./components/Viewports/OpenSCADViewport";
 import { HYWorldViewport } from "./components/Viewports/HYWorldViewport";
-import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu, Palette, Zap, CodeSquare, Globe, ChevronRight } from "lucide-react";
+import { PhotogrammetryViewport } from "./components/Viewports/PhotogrammetryViewport";
+import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu, Palette, Zap, CodeSquare, Globe, ChevronRight, Camera } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useI18n } from "./lib/i18n";
 
@@ -31,12 +35,14 @@ const toolsConfig = [
   { id: "pbr", titleKey: "panel.pbr.title", icon: Palette, component: PBRTexturingViewport, color: "text-purple-400", bg: "bg-purple-900/20 border-purple-500/30", actionKey: "panel.pbr.action", file: "Material_Library_V2.sbsar", id_num: "07", fallbackTitle: "PBR TEXTURING", fallbackAction: "APPLY MATERIAL" },
   { id: "tinker", titleKey: "panel.tinker.title", icon: Zap, component: TinkercadViewport, color: "text-cyan-400", bg: "bg-cyan-900/20 border-cyan-500/30", actionKey: "panel.tinker.action", file: "IoT_Controller.ino", id_num: "08", fallbackTitle: "ELECTRONICS SIM", fallbackAction: "UPLOAD FIRMWARE" },
   { id: "openscad", titleKey: "panel.openscad.title", icon: CodeSquare, component: OpenSCADViewport, color: "text-yellow-500", bg: "bg-yellow-900/20 border-yellow-500/30", actionKey: "panel.openscad.action", file: "Parametric_Bracket.scad", id_num: "09", fallbackTitle: "SCRIPTING CAD", fallbackAction: "RENDER SCRIPT" },
-  { id: "hyworld", titleKey: "panel.hyworld.title", icon: Globe, component: HYWorldViewport, color: "text-pink-500", bg: "bg-pink-900/20 border-pink-500/30", actionKey: "panel.hyworld.action", file: "HY_WorldMirror_Model.pkl", id_num: "10", fallbackTitle: "AI 3D WORLD GEN", fallbackAction: "SYNTHESIZE" }
+  { id: "hyworld", titleKey: "panel.hyworld.title", icon: Globe, component: HYWorldViewport, color: "text-pink-500", bg: "bg-pink-900/20 border-pink-500/30", actionKey: "panel.hyworld.action", file: "HY_WorldMirror_Model.pkl", id_num: "10", fallbackTitle: "AI 3D WORLD GEN", fallbackAction: "SYNTHESIZE" },
+  { id: "photo", titleKey: "photo.title", icon: Camera, component: PhotogrammetryViewport, color: "text-blue-400", bg: "bg-blue-900/20 border-blue-500/30", actionKey: "photo.title", file: "Sparse_Cloud.abc", id_num: "11", fallbackTitle: "PHOTOGRAMMETRY", fallbackAction: "RECONSTRUCT" }
 ];
 
 export default function App() {
   const { t } = useI18n();
   const [activeToolId, setActiveToolId] = useState(toolsConfig[0].id);
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
   const activeTool = toolsConfig.find(t => t.id === activeToolId) || toolsConfig[0];
   const ActiveComponent = activeTool.component;
@@ -44,9 +50,11 @@ export default function App() {
   return (
     <div className="flex h-screen w-full bg-studio-bg overflow-hidden selection:bg-studio-accent/30 selection:text-studio-accent font-mono">
       <Sidebar />
+      <TerminalOverlay />
+      <AIChatPanel isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />
       
       <div className="flex-1 flex flex-col min-w-0">
-        <Header />
+        <Header onOpenAI={() => setIsAIChatOpen(true)} />
         
         <main className="flex-1 flex overflow-hidden bg-studio-grid">
           {/* Internal Explorer Sidebar */}
@@ -76,6 +84,9 @@ export default function App() {
                  );
                })}
              </div>
+             <div className="p-2 border-t border-white/5 bg-black/20">
+               <SystemHealthMonitor />
+             </div>
           </div>
 
           <div className="flex-1 grid grid-cols-1 auto-rows-[minmax(300px,1fr)] min-h-full p-2 h-full overflow-hidden">
@@ -97,8 +108,8 @@ export default function App() {
         {/* Footer Status Bar */}
         <footer className="h-8 bg-studio-panel border-t border-studio-border flex items-center justify-between px-4 shrink-0 text-[9px] font-mono tracking-wider text-white/40">
           <div className="flex gap-6">
-            <PerformanceMetric label="RAM" value={12.4} max={64} unit="GB" color="text-3d-accent" />
-            <PerformanceMetric label="GPU" value={82} max={100} unit="%" color="text-wood-accent" />
+            <PerformanceMetric label="RAM" value={12.4} max={64} unit="MB" color="text-3d-accent" api="/api/system/stats" />
+            <PerformanceMetric label="CPU" value={82} max={100} unit="%" color="text-wood-accent" api="/api/system/stats" />
             <PerformanceMetric label="NET" value={1.2} max={10} unit="GBPS" color="text-pack-accent" />
           </div>
           <div className="flex gap-4">
@@ -111,16 +122,30 @@ export default function App() {
   );
 }
 
-function PerformanceMetric({ label, value, max, unit, color }: { label: string, value: number, max: number, unit: string, color: string }) {
-  const [currentValue, setCurrentValue] = useState(value);
+function PerformanceMetric({ label, value: defaultValue, max, unit, color, api }: { label: string, value: number, max: number, unit: string, color: string, api?: string }) {
+  const [currentValue, setCurrentValue] = useState(defaultValue);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const jitter = (Math.random() - 0.5) * (value * 0.05);
-      setCurrentValue(Math.min(max, Math.max(0, value + jitter)));
-    }, 1500);
+    const interval = setInterval(async () => {
+      if (api) {
+        try {
+          const res = await fetch(api);
+          const data = await res.json();
+          // Map backend stats to labels
+          if (label === "RAM") setCurrentValue(parseFloat(data.rss));
+          if (label === "CPU") setCurrentValue(Math.min(100, (parseFloat(data.uptime) / 3600) * 100)); // Simulated derived load
+        } catch (e) {
+          // Fallback to random jitter if API fails
+          const jitter = (Math.random() - 0.5) * (defaultValue * 0.05);
+          setCurrentValue(Math.min(max, Math.max(0, defaultValue + jitter)));
+        }
+      } else {
+        const jitter = (Math.random() - 0.5) * (defaultValue * 0.05);
+        setCurrentValue(Math.min(max, Math.max(0, defaultValue + jitter)));
+      }
+    }, 2000);
     return () => clearInterval(interval);
-  }, [value, max]);
+  }, [defaultValue, max, api, label]);
 
   return (
     <div className="flex gap-2 items-center">

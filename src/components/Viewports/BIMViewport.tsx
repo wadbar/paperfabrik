@@ -9,15 +9,16 @@ import { Home, Ruler, Layers, BoxSelect, ZoomIn, Upload, Download, FileUp, FileD
 import { useI18n } from "../../lib/i18n";
 import { useTelemetry } from "../../hooks/useTelemetry";
 
+const MATERIAL_SPECS = {
+  Oak: { color: "#8B4513", density: 0.75, feedRate: 200 },
+  Pine: { color: "#F4A460", density: 0.45, feedRate: 400 },
+  Walnut: { color: "#5D4037", density: 0.65, feedRate: 250 },
+  Maple: { color: "#D2B48C", density: 0.70, feedRate: 220 },
+  Steel: { color: "#78909C", density: 7.85, feedRate: 50 },
+} as const;
+
 const getMaterialFeedRate = (material: string | undefined) => {
-  switch (material?.toLowerCase()) {
-    case 'pine': return 400;
-    case 'oak': return 200;
-    case 'walnut': return 250;
-    case 'maple': return 220;
-    case 'steel': return 50;
-    default: return 220;
-  }
+  return MATERIAL_SPECS[material as keyof typeof MATERIAL_SPECS]?.feedRate || 220;
 };
 
 export function BIMViewport() {
@@ -191,19 +192,39 @@ export function BIMViewport() {
                     <option value="250x50mm">250x50</option>
                   </select>
                 </div>
-                <div className="flex justify-between items-center text-[9px] mb-1">
-                  <span className="text-zinc-500">{t("bim.material")}</span>
-                  <select 
-                     className="w-16 bg-black border border-orange-500/30 text-white px-1 py-0.5 rounded text-[9px] focus:border-orange-500 focus:outline-none transition-colors"
-                     value={selectedPart.material}
-                     onChange={e => updateSelectedPart({ material: e.target.value })}
-                  >
-                    <option value="Oak">{t("bim.oak") || "Oak"}</option>
-                    <option value="Pine">{t("bim.pine") || "Pine"}</option>
-                    <option value="Walnut">{t("bim.walnut") || "Walnut"}</option>
-                    <option value="Maple">{t("bim.maple") || "Maple"}</option>
-                    <option value="Steel">{t("bim.steel") || "Steel"}</option>
-                  </select>
+                <div className="space-y-2 mt-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500">{t("bim.material")}</span>
+                    <div className="relative group/mat min-w-[70px]">
+                      <select 
+                         className="w-full bg-black border border-orange-500/30 text-white px-2 py-1 rounded text-[9px] focus:border-orange-500 focus:outline-none transition-all appearance-none cursor-pointer hover:bg-zinc-900"
+                         value={selectedPart.material}
+                         onChange={e => updateSelectedPart({ material: e.target.value })}
+                      >
+                        <option value="Oak">{t("bim.oak") || "Oak"}</option>
+                        <option value="Pine">{t("bim.pine") || "Pine"}</option>
+                        <option value="Walnut">{t("bim.walnut") || "Walnut"}</option>
+                        <option value="Maple">{t("bim.maple") || "Maple"}</option>
+                        <option value="Steel">{t("bim.steel") || "Steel"}</option>
+                      </select>
+                      <div 
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full pointer-events-none transition-colors border border-white/10 shadow-sm"
+                        style={{ backgroundColor: MATERIAL_SPECS[selectedPart.material as keyof typeof MATERIAL_SPECS]?.color || "#ccc" }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="h-0.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-orange-500"
+                      initial={{ width: "0%" }}
+                      animate={{ width: `${(MATERIAL_SPECS[selectedPart.material as keyof typeof MATERIAL_SPECS]?.density / 8) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[7px] text-zinc-600 uppercase tracking-tighter">
+                    <span>{t("bim.density")}</span>
+                    <span>{MATERIAL_SPECS[selectedPart.material as keyof typeof MATERIAL_SPECS]?.density} g/cm³</span>
+                  </div>
                 </div>
                 <PropertyRow label={t("bim.join")} value={t("bim.join.val")} />
               </PropertySection>
@@ -246,49 +267,51 @@ export function BIMViewport() {
                <path d="M 0 150 Q 200 200 400 150 M 200 50 L 200 250" stroke="currentColor" strokeWidth="0.2" opacity="0.3" fill="none" />
                <path d="M 100 120 L 300 180 M 300 120 L 100 180" stroke="currentColor" strokeWidth="0.2" opacity="0.3" fill="none" />
 
-               {/* Abstract Architectural frame */}
-               <g className="text-orange-500/80" fill="none" stroke="currentColor" strokeWidth="1">
-                 {/* Main stud */}
-                 {(() => {
-                   const stud = parts.find(p => p.id === "S-201");
-                   const l = stud ? stud.length / 16 : 150;
-                   const profileW = stud && stud.profile === "150x50mm" ? 30 : stud && stud.profile === "200x50mm" ? 40 : stud && stud.profile === "250x50mm" ? 50 : 20;
-                   return (
-                     <>
-                       <motion.path 
-                         onClick={() => setSelectedPartId("S-201")}
-                         className={`cursor-pointer transition-colors ${selectedPartId === "S-201" ? "fill-orange-500/30 stroke-orange-500" : "fill-orange-500/10 stroke-orange-500/50 hover:fill-orange-500/20"}`}
-                         d={`M 180 80 L ${180 + profileW} ${80 - profileW/2} L ${180 + profileW} ${80 - profileW/2 + l} L 180 ${80 + l} Z`} 
-                         initial={{ opacity: 0, y: 10 }}
-                         animate={{ opacity: 1, y: 0 }}
-                         transition={{ duration: 1 }}
-                       />
-                       <path d={`M ${180 + profileW} ${80 - profileW/2} L ${180 + profileW + 20} ${80 - profileW/2 + 10} L ${180 + profileW + 20} ${80 - profileW/2 + 10 + l} L ${180 + profileW} ${80 - profileW/2 + l}`} opacity="0.5" pointerEvents="none" />
-                     </>
-                   );
-                 })()}
-                 
-                 {/* Connecting beam (Custom Part) */}
-                 {(() => {
-                   const beam = parts.find(p => p.id === "B-104");
-                   const l = beam ? beam.length / 26.66 : 120;
-                   const profileH = beam && beam.profile === "100x50mm" ? 13 : beam && beam.profile === "200x50mm" ? 26 : beam && beam.profile === "250x50mm" ? 33 : 20;
-                   return (
-                     <>
-                       <motion.path 
-                         onClick={() => setSelectedPartId("B-104")}
-                         className={`cursor-pointer transition-colors ${selectedPartId === "B-104" ? "fill-orange-500/40 stroke-orange-400" : "fill-orange-500/20 stroke-orange-500/50 hover:fill-orange-500/30"}`}
-                         d={`M 200 100 L ${200 + l} ${100 + l/2} L ${200 + l} ${100 + l/2 + profileH} L 200 ${100 + profileH} Z`} 
-                         strokeWidth="1.5"
-                         initial={{ opacity: 0, scale: 0.95 }}
-                         animate={{ opacity: 1, scale: 1 }}
-                         transition={{ delay: 0.5, duration: 1 }}
-                       />
-                       <path d={`M ${200 + l} ${100 + l/2} L ${200 + l + 20} ${100 + l/2 - 10} L ${200 + l + 20} ${100 + l/2 - 10 + profileH} L ${200 + l} ${100 + l/2 + profileH}`} opacity="0.5" pointerEvents="none" />
+                {/* Abstract Architectural frame */}
+                <g fill="none" stroke="currentColor" strokeWidth="1">
+                  {/* Main stud */}
+                  {(() => {
+                    const stud = parts.find(p => p.id === "S-201");
+                    const color = MATERIAL_SPECS[stud?.material as keyof typeof MATERIAL_SPECS]?.color || "currentColor";
+                    const l = stud ? stud.length / 16 : 150;
+                    const profileW = stud && stud.profile === "150x50mm" ? 30 : stud && stud.profile === "200x50mm" ? 40 : stud && stud.profile === "250x50mm" ? 50 : 20;
+                    return (
+                      <g style={{ color }}>
+                        <motion.path 
+                          onClick={() => setSelectedPartId("S-201")}
+                          className={`cursor-pointer transition-colors ${selectedPartId === "S-201" ? "fill-orange-500/30 stroke-current" : "fill-current/10 stroke-current/50 hover:fill-current/20"}`}
+                          d={`M 180 80 L ${180 + profileW} ${80 - profileW/2} L ${180 + profileW} ${80 - profileW/2 + l} L 180 ${80 + l} Z`} 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 1 }}
+                        />
+                        <path d={`M ${180 + profileW} ${80 - profileW/2} L ${180 + profileW + 20} ${80 - profileW/2 + 10} L ${180 + profileW + 20} ${80 - profileW/2 + 10 + l} L ${180 + profileW} ${80 - profileW/2 + l}`} opacity="0.5" pointerEvents="none" />
+                      </g>
+                    );
+                  })()}
+                  
+                  {/* Connecting beam (Custom Part) */}
+                  {(() => {
+                    const beam = parts.find(p => p.id === "B-104");
+                    const color = MATERIAL_SPECS[beam?.material as keyof typeof MATERIAL_SPECS]?.color || "currentColor";
+                    const l = beam ? beam.length / 26.66 : 120;
+                    const profileH = beam && beam.profile === "100x50mm" ? 13 : beam && beam.profile === "200x50mm" ? 26 : beam && beam.profile === "250x50mm" ? 33 : 20;
+                    return (
+                      <g style={{ color }}>
+                        <motion.path 
+                          onClick={() => setSelectedPartId("B-104")}
+                          className={`cursor-pointer transition-colors ${selectedPartId === "B-104" ? "fill-orange-500/40 stroke-current" : "fill-current/20 stroke-current/50 hover:fill-current/30"}`}
+                          d={`M 200 100 L ${200 + l} ${100 + l/2} L ${200 + l} ${100 + l/2 + profileH} L 200 ${100 + profileH} Z`} 
+                          strokeWidth="1.5"
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.5, duration: 1 }}
+                        />
+                        <path d={`M ${200 + l} ${100 + l/2} L ${200 + l + 20} ${100 + l/2 - 10} L ${200 + l + 20} ${100 + l/2 - 10 + profileH} L ${200 + l} ${100 + l/2 + profileH}`} opacity="0.5" pointerEvents="none" />
 
                        {/* Cutting Tool Path Indicator */}
                        {selectedPartId === "B-104" && (
-                         <>
+                         <g>
                            <path 
                               d={`M 200 105 L ${200 + l - 5} ${100 + l/2 + 2}`} 
                               stroke="rgba(255, 255, 255, 0.2)" 
@@ -302,9 +325,9 @@ export function BIMViewport() {
                               animate={{ cx: 200 + l - 5, cy: 100 + l/2 + 2 }}
                               transition={{ duration: 600 / getMaterialFeedRate(beam?.material), repeat: Infinity, ease: "linear" }}
                            />
-                         </>
+                         </g>
                        )}
-                     </>
+                     </g>
                    );
                  })()}
                </g>
