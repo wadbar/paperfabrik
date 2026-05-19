@@ -5,17 +5,29 @@ import { Vector3 } from "./geometry";
 class ComputeClient {
   private worker: Worker;
   private messageId = 0;
-  private callbacks = new Map<number, { resolve: (val: any) => void, reject: (err: any) => void }>();
+  private callbacks = new Map<number, { resolve: (val: any) => void, reject: (err: any) => void, timer?: number }>();
 
   constructor() {
     this.worker = new Worker(new URL('../workers/compute.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = this.handleMessage.bind(this);
+    this.worker.onerror = this.handleError.bind(this);
+  }
+
+  private handleError(e: ErrorEvent) {
+    // Notify all pending tasks of catastrophic failure
+    for (const [id, cb] of this.callbacks.entries()) {
+        if (cb.timer) clearTimeout(cb.timer);
+        cb.reject(new Error(`Worker error: ${e.message}`));
+    }
+    this.callbacks.clear();
   }
 
   private handleMessage(e: MessageEvent) {
     const { id, type, data, error } = e.data;
     const callbacks = this.callbacks.get(id);
     if (!callbacks) return;
+
+    if (callbacks.timer) clearTimeout(callbacks.timer);
 
     if (type === "SUCCESS") {
       callbacks.resolve(data);
@@ -25,10 +37,17 @@ class ComputeClient {
     this.callbacks.delete(id);
   }
 
-  private sendCommand<T>(type: string, payload: any): Promise<T> {
+  private sendCommand<T>(type: string, payload: any, timeoutMs: number = 30000): Promise<T> {
     const id = ++this.messageId;
     return new Promise((resolve, reject) => {
-      this.callbacks.set(id, { resolve, reject });
+      const timer = window.setTimeout(() => {
+        if (this.callbacks.has(id)) {
+            this.callbacks.delete(id);
+            reject(new Error(`Worker computation timeout: ${type}`));
+        }
+      }, timeoutMs);
+      
+      this.callbacks.set(id, { resolve, reject, timer });
       this.worker.postMessage({ id, type, data: payload });
     });
   }

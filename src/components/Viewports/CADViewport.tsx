@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Ruler, Compass, Box, Layers, MousePointer2, Settings2, Link, X, Check, 
-  ChevronDown, Download, Activity, Wind, PlayCircle, BarChart3, ZoomIn, Hand, Orbit
+  ChevronDown, Download, Activity, Wind, PlayCircle, BarChart3, ZoomIn, Hand, Orbit,
+  Undo2, Redo2, Grid3X3
 } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 import { useTelemetry } from "../../hooks/useTelemetry";
@@ -32,8 +33,63 @@ export function CADViewport() {
   const [activeViewportTool, setActiveViewportTool] = useState<'orbit' | 'pan' | 'zoom'>('orbit');
 
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [orbit, setOrbit] = useState({ rx: 0, ry: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [showGrid, setShowGrid] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+
+  // History State
+  const [history, setHistory] = useState([
+    { radius: 60, sides: 6, extrude: 40, pan: { x: 0, y: 0 }, orbit: { rx: 0, ry: 0 }, zoom: 1 }
+  ]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
+  const wheelTimeout = React.useRef<number | null>(null);
+
+  const commitState = React.useCallback((overrideState?: any) => {
+     const st = overrideState || { radius, sides, extrude, pan, orbit, zoom };
+     if (JSON.stringify(st) === JSON.stringify(history[historyIndex])) return;
+     
+     const newHistory = history.slice(0, historyIndex + 1);
+     newHistory.push(st);
+     setHistory(newHistory);
+     setHistoryIndex(newHistory.length - 1);
+  }, [radius, sides, extrude, pan, orbit, zoom, history, historyIndex]);
+
+  useEffect(() => {
+    return () => {
+        if (wheelTimeout.current) window.clearTimeout(wheelTimeout.current);
+    }
+  }, []);
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      const idx = historyIndex - 1;
+      const st = history[idx];
+      setRadius(st.radius);
+      setSides(st.sides);
+      setExtrude(st.extrude);
+      setPan(st.pan);
+      setOrbit(st.orbit);
+      setZoom(st.zoom);
+      setHistoryIndex(idx);
+    }
+  };
+
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      const idx = historyIndex + 1;
+      const st = history[idx];
+      setRadius(st.radius);
+      setSides(st.sides);
+      setExtrude(st.extrude);
+      setPan(st.pan);
+      setOrbit(st.orbit);
+      setZoom(st.zoom);
+      setHistoryIndex(idx);
+    }
+  };
 
   // Analysis State
   const [simResult, setSimResult] = useState<SimulationResult | null>(null);
@@ -125,26 +181,34 @@ export function CADViewport() {
   }, [savedSettings.resolution]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (activeViewportTool !== 'pan') return;
+    if (activeViewportTool !== 'pan' && activeViewportTool !== 'orbit' && activeViewportTool !== 'zoom') return;
     e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
     setLastMousePos({ x: e.clientX, y: e.clientY });
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || activeViewportTool !== 'pan') return;
+    if (!isDragging) return;
+    if (activeViewportTool !== 'pan' && activeViewportTool !== 'orbit' && activeViewportTool !== 'zoom') return;
     
     const dx = e.clientX - lastMousePos.x;
     const dy = e.clientY - lastMousePos.y;
     
-    setPan(prev => ({ x: prev.x + dx * 0.5, y: prev.y + dy * 0.5 }));
+    if (activeViewportTool === 'pan') {
+      setPan(prev => ({ x: prev.x + dx * 0.5 / zoom, y: prev.y + dy * 0.5 / zoom }));
+    } else if (activeViewportTool === 'orbit') {
+      setOrbit(prev => ({ rx: prev.rx + dy * 0.01, ry: prev.ry + dx * 0.01 }));
+    } else if (activeViewportTool === 'zoom') {
+      setZoom(prev => Math.max(0.1, Math.min(5, prev * (1 - dy * 0.01))));
+    }
     setLastMousePos({ x: e.clientX, y: e.clientY });
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (activeViewportTool !== 'pan') return;
+    if (activeViewportTool !== 'pan' && activeViewportTool !== 'orbit' && activeViewportTool !== 'zoom') return;
     setIsDragging(false);
     e.currentTarget.releasePointerCapture(e.pointerId);
+    commitState();
   };
 
   const geometryData = useMemo(() => {
@@ -171,21 +235,47 @@ export function CADViewport() {
     const origin = { x: 100, y: 120 };
     const lightDir = new Vector3(1, -1, 1).normalize();
 
-    const projectedFaces = mesh.faces.map(face => {
-      const projectedPoints = face.indices.map(idx => {
-        let v = mesh.vertices[idx];
+    const rotateV = (v: Vector3) => {
+        // RotX
+        let y1 = v.y * Math.cos(orbit.rx) - v.z * Math.sin(orbit.rx);
+        let z1 = v.y * Math.sin(orbit.rx) + v.z * Math.cos(orbit.rx);
+        // RotY
+        let x2 = v.x * Math.cos(orbit.ry) + z1 * Math.sin(orbit.ry);
+        let z2 = -v.x * Math.sin(orbit.ry) + z1 * Math.cos(orbit.ry);
+        return new Vector3(x2, y1, z2);
+    };
+
+    // We sort the faces so that those furthest away are drawn first (painters algorithm)
+    // To do this we first calculate rotated coordinates for all vertices to find the average Z of each face.
+    const rotatedVertices = mesh.vertices.map((v, idx) => {
+        let displacedV = v;
         if (simResult && savedSettings.shading === "Stress") {
-             v = v.add(simResult.vertexDisplacements[idx].mul(10)); 
+             displacedV = v.add(simResult.vertexDisplacements[idx].mul(10)); 
         }
-        const p = ProjectionCompute.project(v);
+        return rotateV(displacedV);
+    });
+
+    const facesWithDepth = mesh.faces.map(face => {
+        let depth = face.indices.reduce((sum, idx) => sum + rotatedVertices[idx].z, 0) / face.indices.length;
+        // Also rotate the normal for lighting calculation
+        // since mesh normals are generated without orbit
+        const rotatedNormal = face.normal ? rotateV(face.normal).normalize() : face.normal;
+        return { ...face, depth, rotatedNormal };
+    });
+
+    facesWithDepth.sort((a, b) => b.depth - a.depth);
+
+    const projectedFaces = facesWithDepth.map(face => {
+      const projectedPoints = face.indices.map(idx => {
+        const p = ProjectionCompute.project(rotatedVertices[idx]);
         return { x: origin.x + p.x, y: origin.y + p.y };
       });
 
-      const intensity = face.normal ? Math.max(0.15, face.normal.dot(lightDir)) : 0.4;
+      const intensity = face.rotatedNormal ? Math.max(0.15, face.rotatedNormal.dot(lightDir)) : 0.4;
       
       let fill = `rgba(59, 130, 246, ${intensity * 0.9})`;
       if (savedSettings.shading === "Stress" && simResult) {
-          const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / 3;
+          const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / face.indices.length;
           const t = (avgStress - simResult.minStress) / (simResult.maxStress - simResult.minStress || 1);
           const r = Math.floor(t * 255);
           const g = Math.floor((1 - t) * 150);
@@ -204,16 +294,16 @@ export function CADViewport() {
     return {
       faces: projectedFaces,
       basePath: ProjectionCompute.pointsToPath(base.map(v => {
-        const p = ProjectionCompute.project(v);
+        const p = ProjectionCompute.project(rotateV(v));
         return { x: origin.x + p.x, y: origin.y + p.y };
       })),
       projectedBase: base.map(v => {
-        const p = ProjectionCompute.project(v);
+        const p = ProjectionCompute.project(rotateV(v));
         return { x: origin.x + p.x, y: origin.y + p.y };
       }),
       mesh
     };
-  }, [radius, sides, extrude]);
+  }, [radius, sides, extrude, orbit, simResult, savedSettings.shading]);
 
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-blue-500/30">
@@ -229,11 +319,11 @@ export function CADViewport() {
              <div className="flex flex-col gap-1 text-[8px] text-white/70">
                 <div className="flex justify-between items-center">
                    <span className="flex items-center gap-1"><Link className="w-2 h-2"/> Radius</span>
-                   <input type="number" value={radius} onChange={e => setRadius(Number(e.target.value))} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
+                   <input type="number" value={radius} onChange={e => setRadius(Number(e.target.value))} onBlur={commitState} onKeyDown={e => e.key === 'Enter' && commitState()} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
                 </div>
                 <div className="flex justify-between items-center">
                    <span className="flex items-center gap-1"><Link className="w-2 h-2"/> Sides</span>
-                   <input type="number" value={sides} onChange={e => setSides(Number(e.target.value))} min={3} max={12} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
+                   <input type="number" value={sides} onChange={e => setSides(Number(e.target.value))} min={3} max={12} onBlur={commitState} onKeyDown={e => e.key === 'Enter' && commitState()} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
                 </div>
              </div>
           </div>
@@ -244,7 +334,7 @@ export function CADViewport() {
              <div className="flex flex-col gap-1 text-[8px] text-white/70">
                 <div className="flex justify-between items-center">
                    <span className="flex items-center gap-1"><Box className="w-2 h-2"/> Length</span>
-                   <input type="number" value={extrude} onChange={e => setExtrude(Number(e.target.value))} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
+                   <input type="number" value={extrude} onChange={e => setExtrude(Number(e.target.value))} onBlur={commitState} onKeyDown={e => e.key === 'Enter' && commitState()} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
                 </div>
              </div>
           </div>
@@ -314,23 +404,36 @@ export function CADViewport() {
 
         {/* CAD Canvas */}
         <div className="flex-1 relative bg-[#0d1117] flex items-center justify-center overflow-hidden">
-           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+           {showGrid && (
+             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+           )}
            
            <svg 
-             className={`w-full h-full text-blue-400 ${activeViewportTool === 'pan' ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
-             viewBox={`${-pan.x} ${-pan.y} 200 200`}
+             className={`w-full h-full text-blue-400 ${activeViewportTool === 'zoom' ? (isDragging ? 'cursor-ns-resize' : 'cursor-zoom-in') : activeViewportTool === 'pan' || activeViewportTool === 'orbit' ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+             viewBox={`${-pan.x + 100 - 100/zoom} ${-pan.y + 100 - 100/zoom} ${200/zoom} ${200/zoom}`}
              shapeRendering={savedSettings.antiAliasing ? "auto" : "crispEdges"}
              onPointerDown={handlePointerDown}
              onPointerMove={handlePointerMove}
              onPointerUp={handlePointerUp}
              onPointerLeave={handlePointerUp}
              onPointerCancel={handlePointerUp}
+             onWheel={(e) => {
+                 const newZoom = Math.max(0.1, Math.min(5, zoom * (1 - e.deltaY * 0.001)));
+                 setZoom(newZoom);
+                 
+                 if (wheelTimeout.current) window.clearTimeout(wheelTimeout.current);
+                 wheelTimeout.current = window.setTimeout(() => {
+                     commitState({ radius, sides, extrude, pan, orbit, zoom: newZoom });
+                 }, 400);
+             }}
            >
              {/* Origin/Axes */}
-             <g className="opacity-40">
-               <path d="M100 20 L100 180 M20 100 L180 100" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="2 2" />
-               <circle cx="100" cy="100" r="1.5" fill="#3b82f6" />
-             </g>
+             {showGrid && (
+               <g className="opacity-40">
+                 <path d="M100 20 L100 180 M20 100 L180 100" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="2 2" />
+                 <circle cx="100" cy="100" r="1.5" fill="#3b82f6" />
+               </g>
+             )}
 
              {/* Mesh Rendering (Shaded) */}
              <g>
@@ -366,6 +469,30 @@ export function CADViewport() {
 
            {/* Viewport controls */}
            <div className="absolute top-2 right-2 flex gap-1 z-10">
+             <button 
+               onClick={undo}
+               disabled={historyIndex === 0}
+               className={`px-1.5 py-1 bg-black/40 border border-white/10 rounded transition-colors ${historyIndex === 0 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:bg-white/10 text-white/60'}`}
+               title="Undo"
+             >
+               <Undo2 className="w-3 h-3" />
+             </button>
+             <button 
+               onClick={redo}
+               disabled={historyIndex === history.length - 1}
+               className={`px-1.5 py-1 bg-black/40 border border-white/10 rounded transition-colors ${historyIndex === history.length - 1 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:bg-white/10 text-white/60'}`}
+               title="Redo"
+             >
+               <Redo2 className="w-3 h-3" />
+             </button>
+             <div className="w-px h-5 bg-white/10 mx-1 self-center" />
+             <button 
+               onClick={() => setShowGrid(!showGrid)}
+               className={`px-1.5 py-1 ${showGrid ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-black/40 border-white/10 text-white/60 hover:bg-white/10'} border rounded cursor-pointer transition-colors`}
+               title={showGrid ? "Hide Grid" : "Show Grid"}
+             >
+               <Grid3X3 className="w-3 h-3" />
+             </button>
              <div className="px-1.5 py-1 bg-black/40 border border-white/10 rounded cursor-pointer hover:bg-white/10 text-white/60 transition-colors">
                   <Box className="w-3 h-3" />
              </div>
@@ -386,24 +513,24 @@ export function CADViewport() {
            </div>
 
            {/* Navigation Toolbar */}
-           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center bg-[#0a0a0b] border border-white/10 rounded-full p-1 shadow-lg z-10">
+           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center bg-[#0a0a0b] border border-white/10 rounded-full p-1 shadow-lg z-10 gap-1">
              <button
                onClick={() => setActiveViewportTool('orbit')}
-               className={`p-1.5 rounded-full transition-colors ${activeViewportTool === 'orbit' ? 'bg-blue-500/20 text-blue-400' : 'text-white/40 hover:text-white/80 hover:bg-white/10'}`}
+               className={`p-1.5 rounded-full transition-all duration-200 ${activeViewportTool === 'orbit' ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)] scale-110' : 'text-white/40 hover:text-white/90 hover:bg-white/10'}`}
                title="Orbit"
              >
                <Orbit className="w-4 h-4" />
              </button>
              <button
                onClick={() => setActiveViewportTool('pan')}
-               className={`p-1.5 rounded-full transition-colors ${activeViewportTool === 'pan' ? 'bg-blue-500/20 text-blue-400' : 'text-white/40 hover:text-white/80 hover:bg-white/10'}`}
+               className={`p-1.5 rounded-full transition-all duration-200 ${activeViewportTool === 'pan' ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)] scale-110' : 'text-white/40 hover:text-white/90 hover:bg-white/10'}`}
                title="Pan"
              >
                <Hand className="w-4 h-4" />
              </button>
              <button
                onClick={() => setActiveViewportTool('zoom')}
-               className={`p-1.5 rounded-full transition-colors ${activeViewportTool === 'zoom' ? 'bg-blue-500/20 text-blue-400' : 'text-white/40 hover:text-white/80 hover:bg-white/10'}`}
+               className={`p-1.5 rounded-full transition-all duration-200 ${activeViewportTool === 'zoom' ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)] scale-110' : 'text-white/40 hover:text-white/90 hover:bg-white/10'}`}
                title="Zoom"
              >
                <ZoomIn className="w-4 h-4" />

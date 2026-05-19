@@ -19,7 +19,16 @@ interface ProcessingNode {
 
 export function PhotogrammetryViewport() {
   const { t } = useI18n();
-  const { recordEvent } = useTelemetry();
+  const { recordEvent } = useTelemetry("PhotogrammetryViewport");
+  const isMounted = React.useRef(true);
+  
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const [nodes, setNodes] = useState<ProcessingNode[]>([
     { id: "FE", labelKey: "photo.feature_extraction", status: "IDLE", progress: 0, duration: 2000 },
     { id: "CA", labelKey: "photo.camera_alignment", status: "IDLE", progress: 0, duration: 3000 },
@@ -98,6 +107,8 @@ export function PhotogrammetryViewport() {
     setNodes(updatedNodes);
 
     for (let i = 0; i < updatedNodes.length; i++) {
+        if (!isMounted.current) break;
+        
         const node = updatedNodes[i];
         node.status = "RUNNING";
         setNodes([...updatedNodes]);
@@ -105,6 +116,10 @@ export function PhotogrammetryViewport() {
         await new Promise(resolve => {
             let progress = 0;
             const interval = setInterval(() => {
+                if (!isMounted.current) {
+                    clearInterval(interval);
+                    return resolve(null);
+                }
                 progress += (100 / (node.duration / 100));
                 node.progress = Math.min(100, progress);
                 setNodes([...updatedNodes]);
@@ -115,14 +130,18 @@ export function PhotogrammetryViewport() {
             }, 100);
         });
 
+        if (!isMounted.current) break;
+
         node.status = "SUCCESS";
         setNodes([...updatedNodes]);
         
         if (node.id === "MESH") generateMesh();
     }
 
-    setIsProcessing(false);
-    recordEvent("PHOTOGRAMMETRY_PIPELINE_COMPLETE");
+    if (isMounted.current) {
+        setIsProcessing(false);
+        recordEvent("PHOTOGRAMMETRY_PIPELINE_COMPLETE");
+    }
   };
 
   const projectedFaces = useMemo(() => {

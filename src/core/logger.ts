@@ -81,6 +81,26 @@ class Logger {
     this.syncWithServer([entry]);
   }
 
+  public info(module: string, message: string, metadata?: Record<string, any>) {
+    this.log(LogLevel.INFO, module, message, metadata);
+  }
+
+  public warn(module: string, message: string, metadata?: Record<string, any>) {
+    this.log(LogLevel.WARN, module, message, metadata);
+  }
+
+  public error(module: string, message: string, metadata?: Record<string, any>) {
+    this.log(LogLevel.ERROR, module, message, metadata);
+  }
+
+  public critical(module: string, message: string, metadata?: Record<string, any>) {
+    this.log(LogLevel.CRITICAL, module, message, metadata);
+  }
+
+  public telemetry(module: string, message: string, metadata?: Record<string, any>) {
+    this.log(LogLevel.TELEMETRY, module, message, metadata);
+  }
+
   private async syncWithServer(entries: LogEntry[]) {
     try {
       await fetch("/api/telemetry/logs", {

@@ -30,11 +30,12 @@ export class SimulationService {
     const vertexDisplacements = mesh.vertices.map(() => Vector3.zero());
     const stressValues = new Array(mesh.vertices.length).fill(0);
 
+    // Precalculate minZ to prevent O(N^2) complexity lock
+    const minZ = mesh.vertices.length > 0 ? Math.min(...mesh.vertices.map(ve => ve.z)) : 0;
+
     // Fixed base logic (Dirichlet boundary condition)
     const fixedVertices = new Set<number>();
     mesh.vertices.forEach((v, i) => {
-      // Find min Z as base
-      const minZ = Math.min(...mesh.vertices.map(ve => ve.z));
       if (Math.abs(v.z - minZ) < anchorZ) {
         fixedVertices.add(i);
       }
@@ -46,7 +47,7 @@ export class SimulationService {
 
         // Mocking stress based on Z-height and distance from central axis
         // Higher vertices feel more bending moment in a cantilever-like simulation
-        const height = Math.abs(v.z - Math.min(...mesh.vertices.map(ve => ve.z)));
+        const height = Math.abs(v.z - minZ);
         const radialDist = Math.sqrt(v.x**2 + v.y**2);
         
         // P=F/A simulation logic (Simplified)
