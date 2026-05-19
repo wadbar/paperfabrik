@@ -10,10 +10,10 @@ export interface SimulationResult {
 }
 
 /**
- * Fabrication Stress Kernel
+ * Fabrication Stress Compute
  * Inspired by Finite Element Analysis (FEA) patterns in FreeCAD/Open3D
  */
-export class SimulationEngine {
+export class SimulationService {
   /**
    * Simulates vertical gravitational load on a mesh structure
    * @param mesh The input geometry
@@ -25,7 +25,7 @@ export class SimulationEngine {
     load: Vector3 = new Vector3(0, -1, 0),
     anchorZ: number = 0.1
   ): SimulationResult {
-    logger.info("SIM_KERNEL", "Starting static load analysis", { vertexCount: mesh.vertices.length });
+    logger.info("SIM_COMPUTE", "Starting static load analysis", { vertexCount: mesh.vertices.length });
 
     const vertexDisplacements = mesh.vertices.map(() => Vector3.zero());
     const stressValues = new Array(mesh.vertices.length).fill(0);
@@ -59,7 +59,7 @@ export class SimulationEngine {
     const maxStress = Math.max(...stressValues);
     const minStress = Math.min(...stressValues);
 
-    logger.info("SIM_KERNEL", "Simulation complete", { peakStress: maxStress });
+    logger.info("SIM_COMPUTE", "Simulation complete", { peakStress: maxStress });
 
     return {
       vertexDisplacements,

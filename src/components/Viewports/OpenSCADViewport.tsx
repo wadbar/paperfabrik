@@ -31,7 +31,7 @@ difference() {
 
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-yellow-500/30">
-      <div className="flex-1 rounded border border-white/5 relative flex bg-studio-grid min-h-0 overflow-hidden">
+      <div className="flex-1 rounded border border-white/5 relative flex bg-studio-dots min-h-0 overflow-hidden">
         
         {/* Editor Side */}
         <div className="w-1/2 flex flex-col border-r border-white/5 bg-[#0d1117] relative">
@@ -64,7 +64,7 @@ difference() {
 
         {/* 3D Viewport Side */}
         <div className="w-1/2 flex flex-col relative bg-[#161b22] items-center justify-center overflow-hidden">
-           {/* Grid */}
+           {/* Canvas */}
            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#eab308 1px, transparent 1px), linear-gradient(90deg, #eab308 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
            
            <AnimatePresence mode="wait">
@@ -97,7 +97,7 @@ difference() {
            </AnimatePresence>
 
            <div className="absolute top-2 right-2 px-1.5 py-1 bg-black/40 border border-white/10 rounded text-yellow-500/60 font-bold text-[8px]">
-              OpenSCAD Engine
+              OpenSCAD Service
            </div>
         </div>
 

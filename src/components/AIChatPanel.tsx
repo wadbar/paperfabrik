@@ -12,6 +12,7 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -19,9 +20,22 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
     }
   }, [messages]);
 
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim() || isTyping) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     const userMessage: ChatMessage = { role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
@@ -32,7 +46,7 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
     setMessages(prev => [...prev, { role: 'assistant', content: "" }]);
 
     try {
-      const stream = AIService.streamChat(input, messages);
+      const stream = AIService.streamChat(input, messages, abortControllerRef.current.signal);
       for await (const chunk of stream) {
         assistantContent += chunk;
         setMessages(prev => {
@@ -41,10 +55,13 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
           return newMessages;
         });
       }
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "SYSTEM_ERROR: Kernel connectivity lost." }]);
+    } catch (err: any) {
+      if (err.message !== 'AbortError') {
+        setMessages(prev => [...prev, { role: 'assistant', content: "SYSTEM_ERROR: Compute connectivity lost." }]);
+      }
     } finally {
       setIsTyping(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -71,7 +88,7 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
               <div className="flex items-center gap-3">
                 <Brain className="w-5 h-5 text-purple-400" />
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white">Kernel Assistant</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white">Compute Assistant</span>
                   <div className="flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-[8px] text-emerald-500/80 uppercase font-bold">L-0 System Active</span>
@@ -96,7 +113,7 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                   <Terminal className="w-12 h-12" />
                   <div className="space-y-1">
                     <p className="text-xs uppercase font-black tracking-tighter">Awaiting Fabrication Instructions</p>
-                    <p className="text-[10px] uppercase">Kernel v3.2.1-stable initialized</p>
+                    <p className="text-[10px] uppercase">Compute v3.2.1-stable initialized</p>
                   </div>
                 </div>
               )}
@@ -112,7 +129,7 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                     {msg.role === 'user' ? (
                       <>COMMAND <div className="w-1 h-1 rounded-full bg-blue-500" /></>
                     ) : (
-                      <><div className="w-1 h-1 rounded-full bg-purple-500" /> KERNEL_OUT</>
+                      <><div className="w-1 h-1 rounded-full bg-purple-500" /> COMPUTE_OUT</>
                     )}
                   </div>
                   <div className={cn(
@@ -138,7 +155,7 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Query Kernel (e.g. Export STL optimization...)"
+                  placeholder="Query Compute (e.g. Export STL optimization...)"
                   className="w-full bg-white/5 border border-white/10 rounded-lg pl-4 pr-12 py-3 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-purple-500/50 transition-all uppercase tracking-tight"
                 />
                 <button
@@ -150,7 +167,7 @@ export function AIChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 </button>
               </form>
               <div className="flex justify-between items-center mt-3 px-1">
-                <span className="text-[7px] text-white/20 uppercase tracking-widest">Protocol: Direct Streaming TLS</span>
+                <span className="text-[7px] text-white/20 uppercase tracking-widest">Connection: Direct Streaming TLS</span>
                 <span className="text-[7px] text-white/20 uppercase tracking-widest">Tokens: 0 / 128k</span>
               </div>
             </div>

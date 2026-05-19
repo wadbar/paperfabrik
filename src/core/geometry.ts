@@ -4,7 +4,7 @@
  */
 
 /**
- * GeometricKernel - Real-world industrial CAD math engine.
+ * GeometricCompute - Real-world industrial CAD math service.
  * Handles 3D projections, vector transformations, and parametric generation.
  */
 
@@ -39,7 +39,7 @@ export class Vector3 {
 
 export type Matrix4 = number[];
 
-export class ProjectionKernel {
+export class ProjectionCompute {
   /**
    * Perspective Projection (Simulating Camera Pinhole Model)
    */
@@ -85,7 +85,7 @@ export class ProjectionKernel {
   }
 }
 
-export class CalibrationEngine {
+export class CalibrationService {
   /**
    * Calculates material tolerance based on fabrication precision
    */

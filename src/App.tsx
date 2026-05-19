@@ -56,7 +56,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header onOpenAI={() => setIsAIChatOpen(true)} />
         
-        <main className="flex-1 flex overflow-hidden bg-studio-grid">
+        <main className="flex-1 flex overflow-hidden bg-studio-dots">
           {/* Internal Explorer Sidebar */}
           <div className="w-56 shrink-0 bg-[#0a0a0b] border-r border-white/5 flex flex-col pt-3">
              <div className="px-4 pb-2 mb-2 border-b border-white/5 text-[9px] uppercase font-black tracking-widest text-white/40">
@@ -89,7 +89,7 @@ export default function App() {
              </div>
           </div>
 
-          <div className="flex-1 grid grid-cols-1 auto-rows-[minmax(300px,1fr)] min-h-full p-2 h-full overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-full p-2 h-full overflow-hidden">
             <FabricationPanel 
               id_num={activeTool.id_num}
               title={t(activeTool.titleKey) || activeTool.fallbackTitle} 

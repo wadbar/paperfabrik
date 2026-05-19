@@ -128,7 +128,7 @@ if (!isMainThread) {
         const chat = ai.chats.create({
           model: "gemini-3-flash-latest",
           config: {
-            systemInstruction: "You are the PaperFabrik AI Kernel. You assist users with CAD, 3D printing, and photogrammetry. Provide precise, technical, and actionable responses. Use JSON if data structure is requested.",
+            systemInstruction: "You are the PaperFabrik AI Compute. You assist users with CAD, 3D printing, and photogrammetry. Provide precise, technical, and actionable responses. Use JSON if data structure is requested.",
             temperature: 0.2,
           }
         });
@@ -147,7 +147,7 @@ if (!isMainThread) {
         res.write('data: [DONE]\n\n');
         res.end();
       } catch (err: any) {
-        logger.error("AI_KERNEL", "Streaming failed", { error: err.message });
+        logger.error("AI_COMPUTE", "Streaming failed", { error: err.message });
         res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
         res.end();
       }
@@ -268,7 +268,7 @@ if (!isMainThread) {
 
     app.post("/api/mesh/filter", (req, res) => {
       const { filterType, meshData } = req.body;
-      logger.info("MESH_KERNEL", `Applying filter: ${filterType}`, { vertexCount: meshData?.vertices?.length });
+      logger.info("MESH_COMPUTE", `Applying filter: ${filterType}`, { vertexCount: meshData?.vertices?.length });
       
       // Real-world filter response logic
       res.json({
@@ -289,13 +289,13 @@ if (!isMainThread) {
       res.sendStatus(200);
     });
 
-    // Self-Healing Kernel Daemon (Inspired by PaperCreeper V12)
-    setInterval(() => {
+    // Self-Healing Compute Daemon (Inspired by PaperCreeper V12)
+    const daemonInterval = setInterval(() => {
       const mem = process.memoryUsage();
       const rssMB = mem.rss / 1024 / 1024;
       
       if (rssMB > 256) {
-        logger.warn("KERNEL_DAEMON", "High Memory detected. Initiating memory boundary check.", { rssMB });
+        logger.warn("COMPUTE_DAEMON", "High Memory detected. Initiating memory boundary check.", { rssMB });
       }
       
       // Heartbeat signal
@@ -303,7 +303,7 @@ if (!isMainThread) {
         timestamp: new Date().toISOString(),
         level: "INFO",
         module: "DAEMON",
-        message: "Kernel Heartbeat: Nominal",
+        message: "Compute Heartbeat: Nominal",
         metadata: { uptime: process.uptime() }
       }));
     }, 10000);
@@ -339,6 +339,7 @@ if (!isMainThread) {
     
     const gracefulShutdown = () => {
       logger.warn("SYSTEM", "Received termination signal, bringing down daemons gracefully.");
+      clearInterval(daemonInterval);
       server.close(() => {
         logger.info("SYSTEM", "HTTP Server closed.");
         process.exit(0);

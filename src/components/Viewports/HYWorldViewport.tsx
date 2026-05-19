@@ -94,12 +94,12 @@ export function HYWorldViewport() {
                   
                   <div className="flex flex-col gap-1">
                      <label className="text-[8px] text-white/60 font-bold">Process Outputs</label>
-                     <div className="grid grid-cols-2 gap-1 text-[7px]">
-                       <div className="bg-pink-900/40 p-1 border border-pink-500/30 rounded text-center text-pink-300">Gaussian Splats</div>
-                       <div className="bg-black/40 p-1 border border-white/10 rounded text-center text-white/60">Point Cloud</div>
-                       <div className="bg-black/40 p-1 border border-white/10 rounded text-center text-white/60">Depth Map</div>
-                       <div className="bg-black/40 p-1 border border-white/10 rounded text-center text-white/60">Normals</div>
-                       <div className="bg-black/40 p-1 border border-white/10 col-span-2 rounded text-center text-white/60">Camera Poses</div>
+                     <div className="flex flex-wrap gap-1 text-[7px]">
+                       <div className="w-[calc(50%-2px)] bg-pink-900/40 p-1 border border-pink-500/30 rounded text-center text-pink-300">Gaussian Splats</div>
+                       <div className="w-[calc(50%-2px)] bg-black/40 p-1 border border-white/10 rounded text-center text-white/60">Point Cloud</div>
+                       <div className="w-[calc(50%-2px)] bg-black/40 p-1 border border-white/10 rounded text-center text-white/60">Depth Map</div>
+                       <div className="w-[calc(50%-2px)] bg-black/40 p-1 border border-white/10 rounded text-center text-white/60">Normals</div>
+                       <div className="w-full bg-black/40 p-1 border border-white/10 rounded text-center text-white/60">Camera Poses</div>
                      </div>
                   </div>
 
@@ -201,7 +201,7 @@ export function HYWorldViewport() {
                            </motion.svg>
                            <div className="absolute bottom-2 left-2 px-1.5 py-1 bg-black/60 border border-white/10 rounded text-pink-500/80 font-bold text-[8px] flex flex-col gap-0.5 backdrop-blur-md">
                              <span>Gaussian Point Count: {synthesizedData?.pointCount?.toLocaleString() || "1,200,000"}</span>
-                             <span>Engine Hash: {synthesizedData?.hash || "NULL"}</span>
+                             <span>Service Hash: {synthesizedData?.hash || "NULL"}</span>
                              <span>Cameras: {synthesizedData?.cameraPoses || "Aligned"}</span>
                              <span>Mesh Size: {synthesizedData?.simulatedMeshSize || "0 MB"}</span>
                            </div>

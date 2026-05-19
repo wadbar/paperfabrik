@@ -7,13 +7,14 @@ import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Ruler, Compass, Box, Layers, MousePointer2, Settings2, Link, X, Check, 
-  ChevronDown, Download, Activity, Wind, PlayCircle, BarChart3 
+  ChevronDown, Download, Activity, Wind, PlayCircle, BarChart3, ZoomIn, Hand, Orbit
 } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 import { useTelemetry } from "../../hooks/useTelemetry";
-import { ProjectionKernel, Vector3 } from "../../core/geometry";
+import { ProjectionCompute, Vector3 } from "../../core/geometry";
 import { Mesh } from "../../core/mesh";
-import { SimulationEngine, SimulationResult } from "../../core/simulation";
+import { SimulationResult } from "../../core/simulation";
+import { computeClient } from "../../core/computeClient";
 
 interface RenderSettings {
   resolution: 'Low' | 'Medium' | 'High';
@@ -28,6 +29,11 @@ export function CADViewport() {
   const [radius, setRadius] = useState(60);
   const [sides, setSides] = useState(6);
   const [extrude, setExtrude] = useState(40);
+  const [activeViewportTool, setActiveViewportTool] = useState<'orbit' | 'pan' | 'zoom'>('orbit');
+
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
 
   // Analysis State
   const [simResult, setSimResult] = useState<SimulationResult | null>(null);
@@ -54,17 +60,21 @@ export function CADViewport() {
     recordEvent("RENDER_SETTINGS_SAVED", tempSettings);
   };
 
-  const runSimulation = () => {
+  const runSimulation = async () => {
     setIsSimulating(true);
     recordEvent("CAD_SIMULATION_START");
     
-    setTimeout(() => {
-        const result = SimulationEngine.simulateStaticLoad(geometryData.mesh);
+    try {
+        const result = await computeClient.simulateStaticLoad(geometryData.mesh);
         setSimResult(result);
-        setIsSimulating(false);
         setSavedSettings(prev => ({ ...prev, shading: "Stress" }));
         recordEvent("CAD_SIMULATION_SUCCESS", { peakStress: result.maxStress });
-    }, 800);
+    } catch (err: any) {
+        console.error("Simulation failed:", err);
+        recordEvent("CAD_SIMULATION_ERROR", { error: err.message });
+    } finally {
+        setIsSimulating(false);
+    }
   };
 
   const handleOpenSettings = () => {
@@ -114,9 +124,32 @@ export function CADViewport() {
     }
   }, [savedSettings.resolution]);
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (activeViewportTool !== 'pan') return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsDragging(true);
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || activeViewportTool !== 'pan') return;
+    
+    const dx = e.clientX - lastMousePos.x;
+    const dy = e.clientY - lastMousePos.y;
+    
+    setPan(prev => ({ x: prev.x + dx * 0.5, y: prev.y + dy * 0.5 }));
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (activeViewportTool !== 'pan') return;
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   const geometryData = useMemo(() => {
-    // Industrial Parametric Generation via GeometryKernel
-    const { base, top } = ProjectionKernel.generateExtrusion(sides, radius, extrude);
+    // Industrial Parametric Generation via GeometryCompute
+    const { base, top } = ProjectionCompute.generateExtrusion(sides, radius, extrude);
     const vertices = [...base, ...top];
     const faces: any[] = [];
     
@@ -144,7 +177,7 @@ export function CADViewport() {
         if (simResult && savedSettings.shading === "Stress") {
              v = v.add(simResult.vertexDisplacements[idx].mul(10)); 
         }
-        const p = ProjectionKernel.project(v);
+        const p = ProjectionCompute.project(v);
         return { x: origin.x + p.x, y: origin.y + p.y };
       });
 
@@ -161,7 +194,7 @@ export function CADViewport() {
       }
 
       return {
-        path: ProjectionKernel.pointsToPath(projectedPoints),
+        path: ProjectionCompute.pointsToPath(projectedPoints),
         intensity,
         points: projectedPoints,
         fill
@@ -170,12 +203,12 @@ export function CADViewport() {
 
     return {
       faces: projectedFaces,
-      basePath: ProjectionKernel.pointsToPath(base.map(v => {
-        const p = ProjectionKernel.project(v);
+      basePath: ProjectionCompute.pointsToPath(base.map(v => {
+        const p = ProjectionCompute.project(v);
         return { x: origin.x + p.x, y: origin.y + p.y };
       })),
       projectedBase: base.map(v => {
-        const p = ProjectionKernel.project(v);
+        const p = ProjectionCompute.project(v);
         return { x: origin.x + p.x, y: origin.y + p.y };
       }),
       mesh
@@ -184,7 +217,7 @@ export function CADViewport() {
 
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-blue-500/30">
-      <div className="flex-1 bg-studio-bg rounded border border-white/5 relative flex gap-px bg-studio-grid min-h-0 overflow-hidden">
+      <div className="flex-1 bg-studio-bg rounded border border-white/5 relative flex gap-px bg-studio-dots min-h-0 overflow-hidden">
         {/* Parametric Tree & Properties */}
         <div className="w-32 bg-[#0a0a0b] flex flex-col p-2 gap-2 shrink-0 overflow-y-auto border-r border-white/5">
           <span className="text-[7px] text-blue-400 uppercase font-black mb-1 flex items-center gap-1">
@@ -234,8 +267,8 @@ export function CADViewport() {
                   <span className="text-emerald-500/80">Aligned</span>
                 </div>
                 <div className="flex justify-between text-[8px] text-white/30 uppercase">
-                  <span>Engine</span>
-                  <span className="text-blue-400/80">Kernel V4</span>
+                  <span>Service</span>
+                  <span className="text-blue-400/80">Compute V4</span>
                 </div>
              </div>
           </div>
@@ -284,9 +317,14 @@ export function CADViewport() {
            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
            
            <svg 
-             className="w-full h-full text-blue-400" 
-             viewBox="0 0 200 200"
+             className={`w-full h-full text-blue-400 ${activeViewportTool === 'pan' ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+             viewBox={`${-pan.x} ${-pan.y} 200 200`}
              shapeRendering={savedSettings.antiAliasing ? "auto" : "crispEdges"}
+             onPointerDown={handlePointerDown}
+             onPointerMove={handlePointerMove}
+             onPointerUp={handlePointerUp}
+             onPointerLeave={handlePointerUp}
+             onPointerCancel={handlePointerUp}
            >
              {/* Origin/Axes */}
              <g className="opacity-40">
@@ -344,6 +382,31 @@ export function CADViewport() {
                title={t("cad.export")}
              >
                  <Download className="w-3 h-3" />
+             </button>
+           </div>
+
+           {/* Navigation Toolbar */}
+           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center bg-[#0a0a0b] border border-white/10 rounded-full p-1 shadow-lg z-10">
+             <button
+               onClick={() => setActiveViewportTool('orbit')}
+               className={`p-1.5 rounded-full transition-colors ${activeViewportTool === 'orbit' ? 'bg-blue-500/20 text-blue-400' : 'text-white/40 hover:text-white/80 hover:bg-white/10'}`}
+               title="Orbit"
+             >
+               <Orbit className="w-4 h-4" />
+             </button>
+             <button
+               onClick={() => setActiveViewportTool('pan')}
+               className={`p-1.5 rounded-full transition-colors ${activeViewportTool === 'pan' ? 'bg-blue-500/20 text-blue-400' : 'text-white/40 hover:text-white/80 hover:bg-white/10'}`}
+               title="Pan"
+             >
+               <Hand className="w-4 h-4" />
+             </button>
+             <button
+               onClick={() => setActiveViewportTool('zoom')}
+               className={`p-1.5 rounded-full transition-colors ${activeViewportTool === 'zoom' ? 'bg-blue-500/20 text-blue-400' : 'text-white/40 hover:text-white/80 hover:bg-white/10'}`}
+               title="Zoom"
+             >
+               <ZoomIn className="w-4 h-4" />
              </button>
            </div>
 
@@ -424,12 +487,12 @@ export function CADViewport() {
                      {/* Shading Mode */}
                      <div>
                        <label className="text-[8px] text-white/40 uppercase mb-1.5 block">Shading Mode</label>
-                       <div className="grid grid-cols-4 gap-1">
+                       <div className="flex flex-wrap gap-1">
                          {(['Wireframe', 'Solid', 'Realistic', 'Stress'] as const).map(mode => (
                            <button 
                              key={mode}
                              onClick={() => setTempSettings({...tempSettings, shading: mode})}
-                             className={`py-1.5 text-[8px] uppercase rounded border transition-all ${tempSettings.shading === mode ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-white/2 border-white/5 text-white/40 hover:bg-white/5'}`}
+                             className={`flex-1 py-1.5 text-[8px] uppercase rounded border transition-all ${tempSettings.shading === mode ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-white/2 border-white/5 text-white/40 hover:bg-white/5'}`}
                            >
                              {mode}
                            </button>
@@ -440,12 +503,12 @@ export function CADViewport() {
                      {/* Output Format Dropdown */}
                      <div className="space-y-2">
                        <span className="text-[8px] uppercase tracking-tighter text-white/50">{t("cad.export_format") || "Export Format"}</span>
-                       <div className="grid grid-cols-4 gap-1">
+                       <div className="flex flex-wrap gap-1">
                          {(['PNG', 'JPG', 'STL', 'OBJ'] as const).map(fmt => (
                             <button 
                                 key={fmt}
                                 onClick={() => setTempSettings({...tempSettings, outputFormat: fmt as any})}
-                                className={`py-1.5 text-[8px] uppercase rounded border transition-all ${tempSettings.outputFormat === fmt ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-white/2 border-white/5 text-white/40 hover:bg-white/5'}`}
+                                className={`flex-1 py-1.5 text-[8px] uppercase rounded border transition-all ${tempSettings.outputFormat === fmt ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-white/2 border-white/5 text-white/40 hover:bg-white/5'}`}
                             >
                                 {fmt}
                             </button>

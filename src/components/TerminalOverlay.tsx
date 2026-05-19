@@ -31,7 +31,7 @@ export function TerminalOverlay() {
     if (!isOpen || logs.length > 0) return;
     const lines = [
       "SEARCHING GITHUB: ALICEVISION/MESHROOM...",
-      "EXTRACTING FEATURE: PROJECTIVE_KERNEL_V4",
+      "EXTRACTING FEATURE: PROJECTIVE_COMPUTE_V4",
       "ANALYZING CHROMIUM Core: V8_ISOLATE_OPTIMIZATION",
       "MINING VLC: BITSTREAM_PARSER_DECOUPLING",
       "INTEGRATING BLENDER: B-MESH_TOPOLOGY_WELD",
@@ -101,7 +101,7 @@ export function TerminalOverlay() {
                 {logs.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center space-y-4">
                         <div className="text-white/10 uppercase tracking-[0.2em] font-black text-center">
-                            Listening for kernel events
+                            Listening for compute events
                         </div>
                         {miningLine && (
                           <div className="flex items-center gap-3">

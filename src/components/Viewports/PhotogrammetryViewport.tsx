@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from "motion/react";
 import { Camera, Cpu, Activity, Database, CheckCircle2, AlertCircle, Loader2, Play, RefreshCw } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 import { useTelemetry } from "../../hooks/useTelemetry";
-import { ProjectionKernel, Vector3 } from "../../core/geometry";
+import { ProjectionCompute, Vector3 } from "../../core/geometry";
 import { Mesh } from "../../core/mesh";
+import { computeClient } from "../../core/computeClient";
 
 type NodeStatus = "IDLE" | "RUNNING" | "SUCCESS" | "ERROR";
 
@@ -27,6 +28,7 @@ export function PhotogrammetryViewport() {
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [mesh, setMesh] = useState<Mesh | null>(null);
+  const [isWorkerBusy, setIsWorkerBusy] = useState(false);
 
   // Generate a procedural dense mesh (Real reconstruction simulation)
   const generateMesh = () => {
@@ -63,20 +65,28 @@ export function PhotogrammetryViewport() {
     setMesh(newMesh);
   };
 
-  const handleSmooth = () => {
-    if (!mesh) return;
-    mesh.smooth(1);
-    mesh.computeNormals();
-    setMesh(new Mesh([...mesh.vertices], [...mesh.faces])); 
-    recordEvent("MESH_SMOOTH_APPLIED");
+  const handleSmooth = async () => {
+    if (!mesh || isWorkerBusy) return;
+    try {
+        setIsWorkerBusy(true);
+        const newMesh = await computeClient.smoothMesh(mesh, 1);
+        setMesh(newMesh);
+        recordEvent("MESH_SMOOTH_APPLIED");
+    } finally {
+        setIsWorkerBusy(false);
+    }
   };
 
-  const handleWeld = () => {
-    if (!mesh) return;
-    mesh.weld(0.1);
-    mesh.computeNormals();
-    setMesh(new Mesh([...mesh.vertices], [...mesh.faces]));
-    recordEvent("MESH_WELD_APPLIED");
+  const handleWeld = async () => {
+    if (!mesh || isWorkerBusy) return;
+    try {
+        setIsWorkerBusy(true);
+        const newMesh = await computeClient.weldMesh(mesh, 0.1);
+        setMesh(newMesh);
+        recordEvent("MESH_WELD_APPLIED");
+    } finally {
+        setIsWorkerBusy(false);
+    }
   };
 
   const startPipeline = async () => {
@@ -122,11 +132,11 @@ export function PhotogrammetryViewport() {
     
     return mesh.faces.map(face => {
         const points = face.indices.map(idx => {
-            const p = ProjectionKernel.project(mesh.vertices[idx]);
+            const p = ProjectionCompute.project(mesh.vertices[idx]);
             return { x: origin.x + p.x, y: origin.y + p.y };
         });
         const intensity = face.normal ? Math.max(0.1, face.normal.dot(lightDir)) : 0.5;
-        return { path: ProjectionKernel.pointsToPath(points), intensity };
+        return { path: ProjectionCompute.pointsToPath(points), intensity };
     });
   }, [mesh]);
 
@@ -168,16 +178,16 @@ export function PhotogrammetryViewport() {
 
         <div className="mt-auto space-y-2">
             {mesh && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex gap-2">
                     <button 
                         onClick={handleSmooth}
-                        className="py-1.5 border border-white/10 hover:bg-white/5 text-white/60 text-[8px] uppercase rounded flex items-center justify-center gap-2 transition-all"
+                        className="flex-1 py-1.5 border border-white/10 hover:bg-white/5 text-white/60 text-[8px] uppercase rounded flex items-center justify-center gap-2 transition-all"
                     >
                         <RefreshCw className="w-3 h-3" /> Smooth
                     </button>
                     <button 
                         onClick={handleWeld}
-                        className="py-1.5 border border-white/10 hover:bg-white/5 text-white/60 text-[8px] uppercase rounded flex items-center justify-center gap-2 transition-all"
+                        className="flex-1 py-1.5 border border-white/10 hover:bg-white/5 text-white/60 text-[8px] uppercase rounded flex items-center justify-center gap-2 transition-all"
                     >
                         <Database className="w-3 h-3" /> Weld
                     </button>

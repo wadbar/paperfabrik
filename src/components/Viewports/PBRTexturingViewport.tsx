@@ -19,7 +19,7 @@ export function PBRTexturingViewport() {
 
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-purple-500/30">
-      <div className="flex-1 rounded border border-white/5 relative flex gap-px bg-studio-grid min-h-0 overflow-hidden">
+      <div className="flex-1 rounded border border-white/5 relative flex gap-px bg-studio-dots min-h-0 overflow-hidden">
         
         {/* Layer Stack */}
         <div className="w-28 bg-[#0a0a0b] flex flex-col p-2 gap-2 shrink-0">
@@ -57,7 +57,7 @@ export function PBRTexturingViewport() {
              {/* 3D Sphere mockup */}
              <circle cx="50" cy="50" r="45" fill="url(#pbr-gradient)" />
              <ellipse cx="50" cy="20" rx="20" ry="10" fill="white" opacity="0.1" filter="blur(2px)" transform="rotate(-30 50 20)"/>
-             {/* Grid/Topology wrapper */}
+             {/* Plane/Topology wrapper */}
              <path d="M5 50 Q 50 100 95 50 M5 50 Q 50 0 95 50 M50 5 Q 100 50 50 95 M50 5 Q 0 50 50 95" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5"/>
              <defs>
                <radialGradient id="pbr-gradient" cx="30%" cy="30%" r="70%">
@@ -102,7 +102,7 @@ export function PBRTexturingViewport() {
             <span className="text-[7px] text-purple-400 uppercase font-black flex items-center gap-1 mb-1">
               <Palette className="w-3 h-3" /> {t("pbr.smart_materials") || "Smart Materials"}
             </span>
-            <div className="grid grid-cols-2 gap-1 mb-2">
+            <div className="flex flex-wrap gap-1 mb-2">
               {smartMaterials.map(mat => (
                 <div 
                   key={mat.id}

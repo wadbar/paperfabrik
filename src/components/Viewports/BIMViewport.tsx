@@ -263,7 +263,7 @@ export function BIMViewport() {
         <div className="flex-1 relative bg-gradient-to-b from-blue-900/10 to-zinc-900/50 flex items-center justify-center">
             
             <svg className="w-full h-full text-zinc-400" viewBox="0 0 400 300">
-               {/* Grid */}
+               {/* Canvas */}
                <path d="M 0 150 Q 200 200 400 150 M 200 50 L 200 250" stroke="currentColor" strokeWidth="0.2" opacity="0.3" fill="none" />
                <path d="M 100 120 L 300 180 M 300 120 L 100 180" stroke="currentColor" strokeWidth="0.2" opacity="0.3" fill="none" />
 

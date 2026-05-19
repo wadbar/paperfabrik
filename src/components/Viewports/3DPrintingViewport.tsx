@@ -50,7 +50,7 @@ export function ThreeDPrintingViewport() {
 
           {/* 3D Viewport */}
           <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-             {/* Blender Grid */}
+             {/* Blender Background */}
              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#a3a3a3 1px, transparent 1px), linear-gradient(90deg, #a3a3a3 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
              
              {/* Axes */}

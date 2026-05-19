@@ -7,7 +7,7 @@ export function SystemHealthMonitor() {
     status: "NOMINAL",
     load: 12,
     integrity: 100,
-    daemons: ["KERNEL", "CNC", "PHOTO", "AI"],
+    daemons: ["COMPUTE", "CNC", "PHOTO", "AI"],
     alerts: [] as string[]
   });
 
@@ -52,7 +52,7 @@ export function SystemHealthMonitor() {
 
       <div className="space-y-2">
         <div className="flex justify-between items-end">
-          <span className="text-[8px] text-white/30 uppercase font-black">Kernel Load</span>
+          <span className="text-[8px] text-white/30 uppercase font-black">Compute Load</span>
           <span className="text-[10px] text-white/80 font-bold">{stats.load}%</span>
         </div>
         <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -66,9 +66,9 @@ export function SystemHealthMonitor() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mt-2">
+      <div className="flex flex-wrap gap-2 mt-2">
         {stats.daemons.map(d => (
-          <div key={d} className="flex items-center gap-2 px-2 py-1 bg-white/5 border border-white/5 rounded">
+          <div key={d} className="flex-1 min-w-[calc(50%-4px)] flex items-center gap-2 px-2 py-1 bg-white/5 border border-white/5 rounded">
             <ShieldCheck className="w-2.5 h-2.5 text-emerald-500/60" />
             <span className="text-[7px] text-white/60 font-bold">{d}_DAEMON</span>
           </div>

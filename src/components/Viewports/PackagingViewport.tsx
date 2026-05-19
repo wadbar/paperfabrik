@@ -1,4 +1,4 @@
-import { FileText, Printer, Grid, Target } from "lucide-react";
+import { FileText, Printer, Target } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 
 export function PackagingViewport() {

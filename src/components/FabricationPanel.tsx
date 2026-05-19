@@ -44,7 +44,7 @@ export function FabricationPanel({
       )}
     >
       {/* Side Icon Strip */}
-      <div className="w-12 border-r border-studio-grid flex flex-col items-center py-4 gap-4 opacity-70 shrink-0">
+      <div className="w-12 border-r border-studio-dots flex flex-col items-center py-4 gap-4 opacity-70 shrink-0">
         <div className={cn("p-2 rounded-md border", accentBg, accentColor)}>
           <Icon className="w-5 h-5" />
         </div>

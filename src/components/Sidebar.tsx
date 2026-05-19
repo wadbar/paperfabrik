@@ -4,7 +4,7 @@ import { cn } from "@/src/lib/utils";
 export function Sidebar() {
   return (
     <aside className="w-12 bg-studio-panel border-r border-studio-border flex flex-col items-center py-4 gap-6 shrink-0 z-50">
-      <div className="w-8 h-8 bg-studio-accent rounded grid place-items-center text-white font-black text-xs">
+      <div className="w-8 h-8 bg-studio-accent rounded flex items-center justify-center text-white font-black text-xs">
         PF
       </div>
       

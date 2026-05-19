@@ -19,8 +19,8 @@ export const translations: TranslationDictionary = {
   "nav.machine_queue": { en: "MACHINE QUEUE", pt: "FILA DE MÁQUINAS" },
   "nav.cloud_sync": { en: "CLOUD SYNC", pt: "NUVEM (SYNC)" },
   
-  "panel.cad.title": { en: "CAD ENGINEERING", pt: "ENGENHARIA CAD" },
-  "panel.cad.action": { en: "ENGINEERING PLAN", pt: "PLANO DE ENGENHARIA" },
+  "panel.cad.title": { en: "CAD SERVICEERING", pt: "ENGENHARIA CAD" },
+  "panel.cad.action": { en: "SERVICEERING PLAN", pt: "PLANO DE ENGENHARIA" },
   "panel.3d.title": { en: "MODIFIERS SQUAD", pt: "MODIFICADORES SQUAD" },
   "panel.3d.action": { en: "APPLY ALL MODIFIERS", pt: "APLICAR MODIFICADORES" },
   "panel.cnc.title": { en: "PRECISION CNC ROUTER", pt: "ROUTER CNC DE PRECISÃO" },
@@ -87,7 +87,7 @@ export const translations: TranslationDictionary = {
   "cad.top": { en: "TOP", pt: "TOPO" },
 
   // Photogrammetry Keys
-  "photo.title": { en: "Photogrammetry Engine", pt: "Motor de Fotogrametria" },
+  "photo.title": { en: "Photogrammetry Service", pt: "Motor de Fotogrametria" },
   "photo.camera_alignment": { en: "Camera Alignment", pt: "Alinhamento de Câmera" },
   "photo.feature_extraction": { en: "Feature Extraction", pt: "Extração de Características" },
   "photo.structure_from_motion": { en: "Structure from Motion", pt: "Estrutura por Movimento" },

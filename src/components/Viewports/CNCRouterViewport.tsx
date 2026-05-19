@@ -15,7 +15,7 @@ export function CNCRouterViewport() {
       <div className="flex-1 bg-studio-bg rounded border border-white/5 relative p-4 flex gap-4 min-h-0 overflow-hidden">
         {/* CNC Bed / Spoilboard Visualization */}
         <div className="flex-1 border border-wood-accent/20 flex items-center justify-center relative bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-80 overflow-hidden rounded-sm">
-           {/* Tool Path Grid */}
+           {/* Tool Path Area */}
            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#f59e0b 0.5px, transparent 0.5px), linear-gradient(90deg, #f59e0b 0.5px, transparent 0.5px)', backgroundSize: '20px 20px' }} />
            
            <svg className="w-5/6 h-5/6 text-wood-accent/50 filter drop-shadow-[0_0_8px_rgba(245,158,11,0.2)]" viewBox="0 0 100 100" fill="none" stroke="currentColor">

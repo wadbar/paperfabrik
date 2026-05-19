@@ -7,7 +7,7 @@ import { logger, LogLevel } from './core/logger.ts';
 import { I18nProvider } from './lib/i18n.tsx';
 
 // Initialize System Core
-logger.log(LogLevel.INFO, "SYSTEM", "Engine Initializing...");
+logger.log(LogLevel.INFO, "SYSTEM", "Service Initializing...");
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
