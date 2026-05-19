@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Ruler, Compass, Box, Layers, MousePointer2, Settings2, Link, X, Check, 
@@ -17,6 +17,14 @@ import { Mesh } from "../../core/mesh";
 import { SimulationResult } from "../../core/simulation";
 import { computeClient } from "../../core/computeClient";
 
+// --- Constants ---
+const DEFAULT_LIGHT_DIR = new Vector3(1, -1, 1).normalize();
+const VIEWPORT_CENTER = { x: 100, y: 120 };
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 8;
+const ORBIT_SENSITIVITY = 0.008;
+const PAN_SENSITIVITY = 0.5;
+
 interface RenderSettings {
   resolution: 'Low' | 'Medium' | 'High';
   antiAliasing: boolean;
@@ -27,13 +35,16 @@ interface RenderSettings {
 export function CADViewport() {
   const { t } = useI18n();
   const { recordEvent } = useTelemetry("CADViewport");
+  
+  // Parametric State
   const [radius, setRadius] = useState(60);
   const [sides, setSides] = useState(6);
   const [extrude, setExtrude] = useState(40);
+  
+  // Viewport State
   const [activeViewportTool, setActiveViewportTool] = useState<'orbit' | 'pan' | 'zoom'>('orbit');
-
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [orbit, setOrbit] = useState({ rx: 0, ry: 0 });
+  const [orbit, setOrbit] = useState({ rx: 0.2, ry: 0.5 }); // Initial orbit for better 3D feel
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [gridSize, setGridSize] = useState(25);
@@ -41,19 +52,69 @@ export function CADViewport() {
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
 
   // History State
-  const [history, setHistory] = useState([
-    { radius: 60, sides: 6, extrude: 40, pan: { x: 0, y: 0 }, orbit: { rx: 0, ry: 0 }, zoom: 1 }
+  const [history, setHistory] = useState<any[]>([
+    { radius: 60, sides: 6, extrude: 40, pan: { x: 0, y: 0 }, orbit: { rx: 0.2, ry: 0.5 }, zoom: 1 }
   ]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  const wheelTimeout = React.useRef<number | null>(null);
+  const wheelTimeout = useRef<number | null>(null);
 
-  const commitState = React.useCallback((overrideState?: any) => {
-     const st = overrideState || { radius, sides, extrude, pan, orbit, zoom };
-     if (JSON.stringify(st) === JSON.stringify(history[historyIndex])) return;
+  // --- Keyboard Precision Pan ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeViewportTool !== 'pan') return;
+      if (document.activeElement?.tagName === 'INPUT') return;
+
+      const step = e.shiftKey ? 10 : 2;
+      switch (e.key) {
+        case 'ArrowLeft':
+          setPan(p => ({ ...p, x: p.x - step }));
+          break;
+        case 'ArrowRight':
+          setPan(p => ({ ...p, x: p.x + step }));
+          break;
+        case 'ArrowUp':
+          setPan(p => ({ ...p, y: p.y - step }));
+          break;
+        case 'ArrowDown':
+          setPan(p => ({ ...p, y: p.y + step }));
+          break;
+        default:
+          return;
+      }
+      e.preventDefault();
+      // Use logic to commit after a short delay or just commit on keyup (complex)
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeViewportTool]);
+
+  // --- Callbacks ---
+
+  const commitState = useCallback((overrideState?: any) => {
+     const currentState = { radius, sides, extrude, pan, orbit, zoom };
+     const nextState = overrideState ? { ...currentState, ...overrideState } : currentState;
+     
+     // Deep comparison (simple) to avoid redundant history
+     const lastState = history[historyIndex];
+     if (
+       lastState.radius === nextState.radius &&
+       lastState.sides === nextState.sides &&
+       lastState.extrude === nextState.extrude &&
+       lastState.pan.x === nextState.pan.x &&
+       lastState.pan.y === nextState.pan.y &&
+       lastState.orbit.rx === nextState.orbit.rx &&
+       lastState.orbit.ry === nextState.orbit.ry &&
+       lastState.zoom === nextState.zoom
+     ) return;
      
      const newHistory = history.slice(0, historyIndex + 1);
-     newHistory.push(st);
+     newHistory.push(nextState);
+     
+     // Cap history at 50 steps
+     if (newHistory.length > 50) newHistory.shift();
+     
      setHistory(newHistory);
      setHistoryIndex(newHistory.length - 1);
   }, [radius, sides, extrude, pan, orbit, zoom, history, historyIndex]);
@@ -64,7 +125,7 @@ export function CADViewport() {
     }
   }, []);
 
-  const undo = () => {
+  const undo = useCallback(() => {
     if (historyIndex > 0) {
       const idx = historyIndex - 1;
       const st = history[idx];
@@ -75,10 +136,11 @@ export function CADViewport() {
       setOrbit(st.orbit);
       setZoom(st.zoom);
       setHistoryIndex(idx);
+      recordEvent("UNDO_ACTION");
     }
-  };
+  }, [historyIndex, history, recordEvent]);
 
-  const redo = () => {
+  const redo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const idx = historyIndex + 1;
       const st = history[idx];
@@ -89,8 +151,9 @@ export function CADViewport() {
       setOrbit(st.orbit);
       setZoom(st.zoom);
       setHistoryIndex(idx);
+      recordEvent("REDO_ACTION");
     }
-  };
+  }, [historyIndex, history, recordEvent]);
 
   // Analysis State
   const [simResult, setSimResult] = useState<SimulationResult | null>(null);
@@ -124,7 +187,21 @@ export function CADViewport() {
     recordEvent("CAD_SIMULATION_START");
     
     try {
-        const result = await computeClient.simulateStaticLoad(geometryData.mesh);
+        // Build the mesh explicitly for simulation
+        const { base, top } = ProjectionCompute.generateExtrusion(sides, radius, extrude);
+        const vertices = [...base, ...top];
+        const faces: any[] = [];
+        for (let i = 0; i < sides; i++) {
+            const next = (i + 1) % sides;
+            faces.push({ indices: [i, next, next + sides] });
+            faces.push({ indices: [next, next + sides, i + sides] });
+        }
+        for (let i = 1; i < sides - 1; i++) {
+            faces.push({ indices: [sides, sides + i, sides + i + 1] });
+        }
+        const simMesh = new Mesh(vertices, faces);
+
+        const result = await computeClient.simulateStaticLoad(simMesh);
         setSimResult(result);
         setSavedSettings(prev => ({ ...prev, shading: "Stress" }));
         recordEvent("CAD_SIMULATION_SUCCESS", { peakStress: result.maxStress });
@@ -164,9 +241,6 @@ export function CADViewport() {
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-      } else {
-        const result = await response.json();
-        console.log("Export Result:", result);
       }
       recordEvent("EXPORT_COMPLETED", { format: savedSettings.outputFormat });
     } catch (err: any) {
@@ -175,59 +249,57 @@ export function CADViewport() {
   };
 
   const currentStrokeWidth = useMemo(() => {
-    switch (savedSettings.resolution) {
-      case 'Low': return 1.5;
-      case 'Medium': return 1.0;
-      case 'High': return 0.5;
-      default: return 1.0;
-    }
-  }, [savedSettings.resolution]);
+    const baseWidth = { 'Low': 1.5, 'Medium': 1.0, 'High': 0.5 }[savedSettings.resolution];
+    return baseWidth / zoom;
+  }, [savedSettings.resolution, zoom]);
+
+  // --- Input Handlers ---
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (activeViewportTool !== 'pan' && activeViewportTool !== 'orbit' && activeViewportTool !== 'zoom') return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDragging(true);
-    setLastMousePos({ x: e.clientX, y: e.clientY });
+    if (activeViewportTool === 'pan' || activeViewportTool === 'orbit' || activeViewportTool === 'zoom') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setIsDragging(true);
+      setLastMousePos({ x: e.clientX, y: e.clientY });
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging) return;
-    if (activeViewportTool !== 'pan' && activeViewportTool !== 'orbit' && activeViewportTool !== 'zoom') return;
     
     const dx = e.clientX - lastMousePos.x;
     const dy = e.clientY - lastMousePos.y;
     
     if (activeViewportTool === 'pan') {
-      setPan(prev => ({ x: prev.x + dx * 0.5 / zoom, y: prev.y + dy * 0.5 / zoom }));
+      setPan(prev => ({ x: prev.x + dx * PAN_SENSITIVITY / zoom, y: prev.y + dy * PAN_SENSITIVITY / zoom }));
     } else if (activeViewportTool === 'orbit') {
-      setOrbit(prev => ({ rx: prev.rx + dy * 0.01, ry: prev.ry + dx * 0.01 }));
+      setOrbit(prev => ({ rx: prev.rx + dy * ORBIT_SENSITIVITY, ry: prev.ry + dx * ORBIT_SENSITIVITY }));
     } else if (activeViewportTool === 'zoom') {
-      setZoom(prev => Math.max(0.1, Math.min(5, prev * (1 - dy * 0.01))));
+      setZoom(prev => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev * (1 - dy * 0.01))));
     }
     setLastMousePos({ x: e.clientX, y: e.clientY });
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (activeViewportTool !== 'pan' && activeViewportTool !== 'orbit' && activeViewportTool !== 'zoom') return;
-    setIsDragging(false);
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    commitState();
+    if (isDragging) {
+      setIsDragging(false);
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      commitState();
+    }
   };
 
+  // --- Render Orchestration ---
+
   const geometryData = useMemo(() => {
-    // Industrial Parametric Generation via GeometryCompute
+    // 1. Generation
     const { base, top } = ProjectionCompute.generateExtrusion(sides, radius, extrude);
     const vertices = [...base, ...top];
     const faces: any[] = [];
     
-    // Side faces (Triangulated for simulation accuracy)
     for (let i = 0; i < sides; i++) {
         const next = (i + 1) % sides;
         faces.push({ indices: [i, next, next + sides] });
         faces.push({ indices: [next, next + sides, i + sides] });
     }
-    
-    // Top face fan
     for (let i = 1; i < sides - 1; i++) {
         faces.push({ indices: [sides, sides + i, sides + i + 1] });
     }
@@ -235,337 +307,304 @@ export function CADViewport() {
     const mesh = new Mesh(vertices, faces);
     mesh.computeNormals();
 
-    const origin = { x: 100, y: 120 };
-    const lightDir = new Vector3(1, -1, 1).normalize();
+    // 2. Pre-calculate rotation matrices (optimized)
+    const cx = Math.cos(orbit.rx);
+    const sx = Math.sin(orbit.rx);
+    const cy = Math.cos(orbit.ry);
+    const sy = Math.sin(orbit.ry);
 
-    const cosRX = Math.cos(orbit.rx);
-    const sinRX = Math.sin(orbit.rx);
-    const cosRY = Math.cos(orbit.ry);
-    const sinRY = Math.sin(orbit.ry);
-
-    const rotateV = (v: Vector3) => {
-        // RotX
-        let y1 = v.y * cosRX - v.z * sinRX;
-        let z1 = v.y * sinRX + v.z * cosRX;
-        // RotY
-        let x2 = v.x * cosRY + z1 * sinRY;
-        let z2 = -v.x * sinRY + z1 * cosRY;
+    const rotateV = (v: Vector3): Vector3 => {
+        // X-axis rotation
+        const y1 = v.y * cx - v.z * sx;
+        const z1 = v.y * sx + v.z * cx;
+        // Y-axis rotation
+        const x2 = v.x * cy + z1 * sy;
+        const z2 = -v.x * sy + z1 * cy;
         return new Vector3(x2, y1, z2);
     };
 
-    // We sort the faces so that those furthest away are drawn first (painters algorithm)
-    // To do this we first calculate rotated coordinates for all vertices to find the average Z of each face.
+    // 3. Transformation Phase
     const rotatedVertices = mesh.vertices.map((v, idx) => {
         let displacedV = v;
         if (simResult && (savedSettings.shading === "Stress" || isSimulating)) {
-             // Factor in displacement for visualization (exaggerated for effect)
              displacedV = v.add(simResult.vertexDisplacements[idx].mul(15)); 
         }
         return rotateV(displacedV);
     });
 
-    const facesWithDepth = mesh.faces.map(face => {
-        let depth = face.indices.reduce((sum, idx) => sum + rotatedVertices[idx].z, 0) / face.indices.length;
-        // Also rotate the normal for lighting calculation
-        // since mesh normals are generated without orbit
+    // 4. Painter's Algorithm Depth Scoring
+    const processedFaces = mesh.faces.map(face => {
+        const depth = face.indices.reduce((sum, idx) => sum + rotatedVertices[idx].z, 0) / face.indices.length;
         const rotatedNormal = face.normal ? rotateV(face.normal).normalize() : face.normal;
-        return { ...face, depth, rotatedNormal };
+        
+        // Intensity for lighting
+        const intensity = rotatedNormal ? Math.max(0.1, rotatedNormal.dot(DEFAULT_LIGHT_DIR)) : 0.4;
+        
+        // Shading Logic
+        let fill = `rgba(59, 130, 246, ${intensity * 0.9})`;
+        if (savedSettings.shading === "Realistic") {
+            const spec = Math.pow(intensity, 4);
+            const baseColor = 100 + intensity * 60;
+            const r = Math.min(255, baseColor + spec * 100);
+            const g = Math.min(255, baseColor + 5 + spec * 100);
+            const b = Math.min(255, baseColor + 15 + spec * 100);
+            fill = `rgba(${r.toFixed(0)}, ${g.toFixed(0)}, ${b.toFixed(0)}, 0.98)`;
+        } else if (savedSettings.shading === "Stress") {
+            if (simResult) {
+                const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / face.indices.length;
+                const t = (avgStress - simResult.minStress) / (simResult.maxStress - simResult.minStress || 1);
+                const hue = Math.max(0, 240 - (t * 240));
+                fill = `hsla(${hue.toFixed(0)}, 85%, 50%, ${0.6 + intensity * 0.4})`;
+            } else {
+                fill = `rgba(100, 100, 100, ${intensity * 0.5})`;
+            }
+        } else if (savedSettings.shading === "Wireframe") {
+            fill = "#0d1117"; 
+        }
+
+        const points = face.indices.map(idx => {
+            const p = ProjectionCompute.project(rotatedVertices[idx]);
+            return { x: VIEWPORT_CENTER.x + p.x, y: VIEWPORT_CENTER.y + p.y };
+        });
+
+        return {
+            path: ProjectionCompute.pointsToPath(points),
+            depth,
+            fill,
+            intensity
+        };
     });
 
-    facesWithDepth.sort((a, b) => b.depth - a.depth);
-
-    const projectedFaces = facesWithDepth.map(face => {
-      const projectedPoints = face.indices.map(idx => {
-        const p = ProjectionCompute.project(rotatedVertices[idx]);
-        return { x: origin.x + p.x, y: origin.y + p.y };
-      });
-
-      const intensity = face.rotatedNormal ? Math.max(0.15, face.rotatedNormal.dot(lightDir)) : 0.4;
-      
-      let fill = `rgba(59, 130, 246, ${intensity * 0.9})`;
-      if (savedSettings.shading === "Realistic") {
-          const spec = Math.pow(intensity, 4);
-          const baseColor = 100 + intensity * 60;
-          const r = Math.min(255, baseColor + spec * 100);
-          const g = Math.min(255, baseColor + 5 + spec * 100);
-          const b = Math.min(255, baseColor + 15 + spec * 100);
-          fill = `rgba(${r.toFixed(0)}, ${g.toFixed(0)}, ${b.toFixed(0)}, 0.98)`;
-      } else if (savedSettings.shading === "Stress") {
-          if (simResult) {
-            const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / face.indices.length;
-            const t = (avgStress - simResult.minStress) / (simResult.maxStress - simResult.minStress || 1);
-            // HSL Gradient: Blue (240) to Red (0)
-            const hue = Math.max(0, 240 - (t * 240));
-            fill = `hsla(${hue.toFixed(0)}, 85%, 50%, ${0.6 + intensity * 0.4})`;
-          } else {
-            // Fallback if Stress mode selected but no result
-            fill = `rgba(100, 100, 100, ${intensity * 0.5})`;
-          }
-      } else if (savedSettings.shading === "Wireframe") {
-          fill = "#0d1117"; // Match background for Hidden Line Removal (HLR)
-      }
-
-      return {
-        path: ProjectionCompute.pointsToPath(projectedPoints),
-        intensity,
-        points: projectedPoints,
-        fill
-      };
-    });
+    processedFaces.sort((a, b) => b.depth - a.depth);
 
     return {
-      faces: projectedFaces,
+      faces: processedFaces,
       basePath: ProjectionCompute.pointsToPath(base.map(v => {
         const p = ProjectionCompute.project(rotateV(v));
-        return { x: origin.x + p.x, y: origin.y + p.y };
+        return { x: VIEWPORT_CENTER.x + p.x, y: VIEWPORT_CENTER.y + p.y };
       })),
       projectedBase: base.map(v => {
         const p = ProjectionCompute.project(rotateV(v));
-        return { x: origin.x + p.x, y: origin.y + p.y };
+        return { x: VIEWPORT_CENTER.x + p.x, y: VIEWPORT_CENTER.y + p.y };
       }),
       mesh
     };
-  }, [radius, sides, extrude, orbit, simResult, savedSettings.shading]);
+  }, [radius, sides, extrude, orbit, simResult, savedSettings.shading, isSimulating]);
 
   return (
     <div className="flex h-full flex-col font-mono text-[11px] selection:bg-blue-500/30">
-      <div className="flex-1 bg-studio-bg rounded border border-white/5 relative flex gap-px bg-studio-dots min-h-0 overflow-hidden">
-        {/* Parametric Tree & Properties */}
-        <div className="w-32 bg-[#0a0a0b] flex flex-col p-2 gap-2 shrink-0 overflow-y-auto border-r border-white/5">
-          <span className="text-[7px] text-blue-400 uppercase font-black mb-1 flex items-center gap-1">
-             <Layers className="w-3 h-3" /> {t("cad.tree")}
-          </span>
-          <TreeItem name="Sketch_01" icon={MousePointer2} active />
-          
-          <div className="pl-3 py-1 space-y-2 border-b border-white/5 pb-3">
-             <div className="flex flex-col gap-1 text-[8px] text-white/70">
-                <div className="flex justify-between items-center">
-                   <span className="flex items-center gap-1"><Link className="w-2 h-2"/> Radius</span>
-                   <input 
-                      type="number" 
-                      value={radius} 
-                      onChange={e => setRadius(Math.max(1, Number(e.target.value)))} 
-                      onBlur={commitState} 
-                      onKeyDown={e => e.key === 'Enter' && commitState()} 
-                      className="w-10 bg-black/40 border border-white/10 hover:border-blue-500/50 px-1 rounded text-right focus:outline-none focus:border-blue-500 transition-colors" 
-                   />
-                </div>
-                <div className="flex justify-between items-center">
-                   <span className="flex items-center gap-1"><Link className="w-2 h-2"/> Sides</span>
-                   <input 
-                      type="number" 
-                      value={sides} 
-                      onChange={e => setSides(Math.min(32, Math.max(3, Number(e.target.value))))} 
-                      onBlur={commitState} 
-                      onKeyDown={e => e.key === 'Enter' && commitState()} 
-                      className="w-10 bg-black/40 border border-white/10 hover:border-blue-500/50 px-1 rounded text-right focus:outline-none focus:border-blue-500 transition-colors" 
-                   />
-                </div>
-             </div>
-          </div>
-
-          <TreeItem name="Extrude_Pad" icon={Box} />
-          
-          <div className="pl-3 py-1 space-y-2 border-b border-white/5 pb-3 mb-2">
-             <div className="flex flex-col gap-1 text-[8px] text-white/70">
-                <div className="flex justify-between items-center">
-                   <span className="flex items-center gap-1"><Box className="w-2 h-2"/> Length</span>
-                   <input 
-                      type="number" 
-                      value={extrude} 
-                      onChange={e => setExtrude(Math.max(1, Number(e.target.value)))} 
-                      onBlur={commitState} 
-                      onKeyDown={e => e.key === 'Enter' && commitState()} 
-                      className="w-10 bg-black/40 border border-white/10 hover:border-blue-500/50 px-1 rounded text-right focus:outline-none focus:border-blue-500 transition-colors" 
-                   />
-                </div>
-             </div>
-          </div>
-
-          <div className="mt-2 space-y-3">
-             <span className="text-[7px] text-emerald-400 uppercase font-black px-1 flex items-center gap-1">
-                <Activity className="w-3 h-3" /> MESH ANALYSIS
+      <div className="flex-1 bg-[#0a0a0b] rounded border border-white/5 relative flex gap-px bg-studio-dots min-h-0 overflow-hidden">
+        
+        {/* Sidebar: Tree & Analysis */}
+        <aside className="w-32 bg-[#0d1117] flex flex-col p-2 gap-2 shrink-0 overflow-y-auto border-r border-white/5 shadow-xl">
+          <header className="px-1 py-2 border-b border-white/5 flex items-center justify-between">
+             <span className="text-[7px] text-blue-400 uppercase font-black flex items-center gap-1 opacity-80">
+                <Layers className="w-3 h-3" /> ASSEMBLY TREE
              </span>
-             <div className="flex flex-col gap-1 px-1">
-                <div className="flex justify-between text-[8px] text-white/30 uppercase">
-                  <span>Vertices</span>
-                  <span className="text-white/60">{geometryData.mesh.vertices.length}</span>
-                </div>
-                <div className="flex justify-between text-[8px] text-white/30 uppercase">
-                  <span>Faces</span>
-                  <span className="text-white/60">{geometryData.mesh.faces.length}</span>
-                </div>
-                <div className="flex justify-between text-[8px] text-white/30 uppercase">
-                  <span>Normal Ref</span>
-                  <span className="text-emerald-500/80">Aligned</span>
-                </div>
-                <div className="flex justify-between text-[8px] text-white/30 uppercase">
-                  <span>Service</span>
-                  <span className="text-blue-400/80">Compute V4</span>
-                </div>
-             </div>
-          </div>
+             <ChevronDown className="w-2.5 h-2.5 text-white/20" />
+          </header>
 
-          <div className="mt-4 px-1 space-y-2 border-t border-white/5 pt-4">
-             <span className="text-[7px] text-amber-500 uppercase font-black flex items-center gap-1">
-                <Wind className="w-3 h-3" /> {t("sim.title")}
-             </span>
-             {simResult ? (
-                 <div className="space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                    <div className="bg-amber-500/10 border border-amber-500/20 p-1.5 rounded">
-                        <div className="flex justify-between text-[8px] text-amber-200/60 uppercase">
-                            <span>{t("sim.peak_stress")}</span>
-                            <span className="font-bold">{simResult.maxStress.toFixed(3)} MPa</span>
-                        </div>
-                        <div className="h-1 w-full bg-black/40 rounded-full mt-1 overflow-hidden">
-                            <motion.div 
-                                className="h-full bg-amber-500"
-                                initial={{ width: 0 }}
-                                animate={{ width: "85%" }}
-                            />
-                        </div>
+          <nav className="flex flex-col gap-0.5">
+             <TreeItem name="Sketch_Main" icon={MousePointer2} active />
+             <div className="pl-3 py-1 space-y-2 mb-2">
+                <ParametricInput label="Radius" value={radius} onChange={setRadius} onCommit={commitState} />
+                <ParametricInput label="Sides" value={sides} onChange={setSides} onCommit={commitState} min={3} max={64} />
+             </div>
+
+             <TreeItem name="Pad_Extrude" icon={Box} />
+             <div className="pl-3 py-1 space-y-2 mb-2">
+                <ParametricInput label="Height" value={extrude} onChange={setExtrude} onCommit={commitState} />
+             </div>
+          </nav>
+
+          <footer className="mt-auto pt-4 space-y-4">
+             <section className="space-y-2">
+                <span className="text-[7px] text-emerald-400 uppercase font-black px-1 flex items-center gap-1 opacity-60">
+                   <Activity className="w-3 h-3" /> TELEMETRY
+                </span>
+                <div className="flex flex-col gap-1 px-1 text-[8px] text-white/20 uppercase tracking-widest">
+                   <div className="flex justify-between"><span>Verts</span><span className="text-white/60">{geometryData.mesh.vertices.length}</span></div>
+                   <div className="flex justify-between"><span>Faces</span><span className="text-white/60">{geometryData.mesh.faces.length}</span></div>
+                </div>
+             </section>
+
+             <section className="px-1 space-y-2 border-t border-white/5 pt-4">
+                <span className="text-[7px] text-amber-500 uppercase font-black flex items-center gap-1">
+                   <Wind className="w-3 h-3" /> F.E.A. CORE
+                </span>
+                {simResult ? (
+                    <div className="space-y-1.5 animate-in fade-in slide-in-from-bottom-1 duration-300">
+                       <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded-sm ring-1 ring-amber-500/5">
+                           <div className="flex justify-between text-[7px] text-amber-200/40 uppercase font-black">
+                               <span>Peak</span>
+                               <span className="text-amber-400 font-mono tracking-tight">{simResult.maxStress.toFixed(3)} MPa</span>
+                           </div>
+                           <div className="h-1 w-full bg-black/40 rounded-full mt-1.5 overflow-hidden">
+                               <motion.div className="h-full bg-amber-500" initial={{ width: 0 }} animate={{ width: "85%" }} />
+                           </div>
+                       </div>
+                       <button onClick={() => setSimResult(null)} className="w-full py-1 text-[7px] text-white/20 uppercase hover:text-white hover:bg-white/5 rounded transition-all">Clear Solution</button>
                     </div>
+                ) : (
                     <button 
-                        onClick={() => setSimResult(null)}
-                        className="w-full py-1 text-[7px] text-white/40 uppercase hover:text-white transition-colors"
+                       onClick={runSimulation}
+                       disabled={isSimulating}
+                       className="w-full py-2 bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500 hover:text-black hover:border-amber-400 text-amber-500/80 text-[8px] font-black uppercase rounded-sm flex items-center justify-center gap-2 transition-all group active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                        Clear Simulation
+                       {isSimulating ? <Activity className="w-3 h-3 animate-spin" /> : <PlayCircle className="w-3 h-3 group-hover:fill-current" />}
+                       {isSimulating ? "Solving..." : "Compute Stress"}
                     </button>
-                 </div>
-             ) : (
-                 <button 
-                    onClick={runSimulation}
-                    disabled={isSimulating}
-                    className="w-full py-2 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500 hover:text-black text-amber-400 text-[8px] font-black uppercase rounded flex items-center justify-center gap-2 transition-all group"
-                 >
-                    {isSimulating ? <Wind className="w-3 h-3 animate-spin" /> : <PlayCircle className="w-3 h-3 group-hover:fill-current" />}
-                    {isSimulating ? t("sim.status_solving") : t("sim.run")}
-                 </button>
-             )}
-          </div>
-        </div>
+                )}
+             </section>
+          </footer>
+        </aside>
 
-        {/* CAD Canvas */}
-        <div className="flex-1 relative bg-[#0d1117] flex items-center justify-center overflow-hidden">
+        {/* Main Viewport */}
+        <main className="flex-1 relative bg-[#09090b] flex items-center justify-center overflow-hidden">
            {showGrid && (
-             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: `${gridSize}px ${gridSize}px` }} />
+             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: `${gridSize}px ${gridSize}px` }} />
            )}
            
            {/* Navigation HUD */}
-           <div className="absolute bottom-4 left-4 pointer-events-none flex flex-col gap-2">
-              <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-lg p-2 px-3 flex flex-col gap-1 shadow-2xl">
-                <div className="flex items-center justify-between gap-6">
-                  <span className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Navigation HUD</span>
-                  <div className={`w-1.5 h-1.5 rounded-full ${isDragging ? 'bg-blue-500 animate-pulse' : 'bg-white/20'}`} />
+           <div className="absolute bottom-6 left-6 pointer-events-none flex flex-col gap-2 z-10 scale-90 origin-bottom-left">
+              <motion.div 
+                layout
+                className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-3 px-4 flex flex-col gap-2 shadow-2xl ring-1 ring-white/5"
+              >
+                <header className="flex items-center justify-between gap-8">
+                  <span className="text-[9px] text-white/30 uppercase font-black tracking-[0.2em] leading-none">Status_HUD_0.4</span>
+                  <div className={`w-2 h-2 rounded-full ring-4 ${isDragging ? 'bg-blue-500 ring-blue-500/20 animate-pulse' : 'bg-white/10 ring-transparent'}`} />
+                </header>
+
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                  <HUDItem icon={ZoomIn} value={`${Math.round(zoom * 100)}%`} label="Zoom" />
+                  <div className="flex flex-col gap-0.5">
+                     <span className="text-[6px] text-white/20 uppercase font-black tracking-widest">Pan_Offset</span>
+                     <div className="flex items-center gap-1 text-[9px] font-mono text-white/50 relative group/hud-pan">
+                        <input className="bg-transparent w-8 focus:text-blue-400 focus:outline-none" value={pan.x.toFixed(0)} onChange={e => {
+                          const v = parseFloat(e.target.value);
+                          if (!isNaN(v)) setPan(p => ({ ...p, x: v }));
+                        }} />
+                        <span className="text-white/10">|</span>
+                        <input className="bg-transparent w-8 focus:text-blue-400 focus:outline-none" value={pan.y.toFixed(0)} onChange={e => {
+                           const v = parseFloat(e.target.value);
+                           if (!isNaN(v)) setPan(p => ({ ...p, y: v }));
+                        }} />
+                        
+                        {/* Precision Nudges */}
+                        {activeViewportTool === 'pan' && (
+                           <div className="absolute -right-10 top-0 flex flex-col gap-0.5 opacity-0 group-hover/hud-pan:opacity-100 transition-opacity">
+                              <div className="flex gap-0.5">
+                                 <button onClick={() => setPan(p => ({ ...p, y: p.y - 1 }))} className="p-0.5 hover:bg-white/10 rounded-sm"><ChevronDown className="w-2.5 h-2.5 rotate-180 text-blue-400" /></button>
+                                 <button onClick={() => setPan(p => ({ ...p, x: p.x + 1 }))} className="p-0.5 hover:bg-white/10 rounded-sm"><ChevronDown className="w-2.5 h-2.5 -rotate-90 text-blue-400" /></button>
+                              </div>
+                              <div className="flex gap-0.5">
+                                 <button onClick={() => setPan(p => ({ ...p, x: p.x - 1 }))} className="p-0.5 hover:bg-white/10 rounded-sm"><ChevronDown className="w-2.5 h-2.5 rotate-90 text-blue-400" /></button>
+                                 <button onClick={() => setPan(p => ({ ...p, y: p.y + 1 }))} className="p-0.5 hover:bg-white/10 rounded-sm"><ChevronDown className="w-2.5 h-2.5 text-blue-400" /></button>
+                              </div>
+                           </div>
+                        )}
+                     </div>
+                  </div>
+                  <HUDItem icon={Orbit} value={`${(orbit.ry * 57.3).toFixed(1)}°`} label="Rotation" />
+                  <HUDItem icon={Layers} value={savedSettings.shading} label="Mode" highlight />
                 </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  <div className="flex items-center gap-1.5 transition-all">
-                    <ZoomIn className="w-2.5 h-2.5 text-blue-400/60" />
-                    <span className="text-[10px] font-mono text-white/80 select-none tracking-tight">{Math.round(zoom * 100)}%</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Hand className="w-2.5 h-2.5 text-blue-400/60" />
-                    <span className="text-[9px] font-mono text-white/50 select-none overflow-hidden text-ellipsis whitespace-nowrap max-w-[50px]">{pan.x.toFixed(0)},{pan.y.toFixed(0)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Orbit className="w-2.5 h-2.5 text-blue-400/60" />
-                    <span className="text-[9px] font-mono text-white/50 select-none">{(orbit.ry * 57.3).toFixed(0)}°</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Layers className="w-2.5 h-2.5 text-blue-400/60" />
-                    <span className="text-[8px] font-mono text-blue-400/80 select-none uppercase tracking-tighter truncate max-w-[45px]">{savedSettings.shading}</span>
-                  </div>
-                </div>
+
                 {savedSettings.shading === "Stress" && simResult && (
-                   <div className="mt-2 pt-2 border-t border-white/5 space-y-1">
-                      <div className="flex justify-between items-center text-[7px] text-white/40 uppercase tracking-widest font-black">
-                         <span>Low</span>
-                         <span>Stress Legend</span>
-                         <span>High</span>
+                   <div className="mt-2 pt-2 border-t border-white/5 space-y-1.5">
+                      <div className="flex justify-between items-center text-[7px] text-white/30 uppercase tracking-[0.1em] font-black">
+                         <span>MIN_LOAD</span>
+                         <span className="text-white/10">---</span>
+                         <span>MAX_LOAD</span>
                       </div>
-                      <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-green-400 via-yellow-400 to-red-500 rounded-full" />
+                      <div className="h-2 w-full bg-gradient-to-r from-blue-600 via-emerald-500 via-yellow-400 to-red-600 rounded-full relative shadow-inner">
+                         <div className="absolute top-0 left-[85%] w-px h-full bg-white/40 shadow-[0_0_8px_white]" />
+                      </div>
                    </div>
                 )}
-                <div className="mt-1 pt-1 border-t border-white/5 flex items-center justify-between">
+
+                <footer className="mt-1 pt-2 border-t border-white/5 flex items-center justify-between opacity-50">
                    <div className="flex flex-col">
-                      <div className="w-10 h-0.5 bg-blue-500/40 relative">
-                         <div className="absolute top-0 left-0 w-0.5 h-1 bg-blue-500/40 -translate-y-1/2" />
-                         <div className="absolute top-0 right-0 w-0.5 h-1 bg-blue-500/40 -translate-y-1/2" />
+                      <div className="w-12 h-0.5 bg-blue-500/20 relative">
+                         <div className="absolute -top-1 left-0 w-0.5 h-2 bg-blue-500/40" />
+                         <div className="absolute -top-1 right-0 w-0.5 h-2 bg-blue-500/40" />
                       </div>
-                      <span className="text-[6px] text-white/20 uppercase tracking-widest mt-0.5">Scale: {Math.round(10/zoom)}mm</span>
+                      <span className="text-[6px] text-white/40 uppercase tracking-widest mt-1">Scale: {Math.round(10/zoom)}mm</span>
                    </div>
-                   <span className="text-[6px] text-white/20 uppercase tracking-widest">Grid: {gridSize}mm</span>
-                </div>
-              </div>
+                   <span className="text-[6px] text-white/40 uppercase tracking-widest">Grid: {gridSize}mm</span>
+                </footer>
+              </motion.div>
            </div>
 
-           {/* Orientation Gizmo (Compass) */}
-           <div className="absolute bottom-4 right-4 w-16 h-16 pointer-events-none opacity-60">
-              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
-                <g transform={`translate(50, 50) rotate(${orbit.ry * 57.3}) scale(${Math.cos(orbit.rx)})`}>
-                   <circle cx="0" cy="0" r="40" fill="none" stroke="white" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.2" />
-                   {/* X Axis */}
-                   <line x1="0" y1="0" x2="35" y2="0" stroke="#ef4444" strokeWidth="1.5" />
-                   <text x="40" y="4" fontSize="12" fill="#ef4444" fontWeight="bold" textAnchor="middle">X</text>
-                   {/* Y Axis (actually mapped to Z in most CAD, but Y in 2D space) */}
-                   <line x1="0" y1="0" x2="0" y2="-35" stroke="#22c55e" strokeWidth="1.5" />
-                   <text x="0" y="-40" fontSize="12" fill="#22c55e" fontWeight="bold" textAnchor="middle">Y</text>
+           {/* Orientation Gizmo */}
+           <div className="absolute bottom-6 right-6 w-20 h-20 pointer-events-none opacity-40 select-none">
+              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+                <g transform={`translate(50, 50) rotate(${orbit.ry * 57.3}) scale(${Math.max(0.2, Math.cos(orbit.rx))})`}>
+                   <circle cx="0" cy="0" r="40" fill="none" stroke="white" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.1" />
+                   <g className="transition-all duration-300">
+                      <line x1="0" y1="0" x2="38" y2="0" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+                      <circle cx="38" cy="0" r="2.5" fill="#ef4444" />
+                      <text x="46" y="4" fontSize="11" fill="#ef4444" fontWeight="900" textAnchor="middle" className="font-mono">X</text>
+                   </g>
+                   <g className="transition-all duration-300">
+                      <line x1="0" y1="0" x2="0" y2="-38" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" />
+                      <circle cx="0" cy="-38" r="2.5" fill="#22c55e" />
+                      <text x="0" y="-46" fontSize="11" fill="#22c55e" fontWeight="900" textAnchor="middle" className="font-mono">Y</text>
+                   </g>
                 </g>
               </svg>
            </div>
            
+           {/* SVG Canvas Renderer */}
            <svg 
-             className={`w-full h-full text-blue-400 ${activeViewportTool === 'zoom' ? (isDragging ? 'cursor-ns-resize' : 'cursor-zoom-in') : activeViewportTool === 'pan' || activeViewportTool === 'orbit' ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+             className={`w-full h-full text-blue-400 select-none ${activeViewportTool === 'zoom' ? (isDragging ? 'cursor-ns-resize' : 'cursor-zoom-in') : (isDragging ? 'cursor-grabbing' : 'cursor-grab')}`}
              viewBox={`${-pan.x + 100 - 100/zoom} ${-pan.y + 100 - 100/zoom} ${200/zoom} ${200/zoom}`}
-             shapeRendering={savedSettings.antiAliasing ? "auto" : "crispEdges"}
+             shapeRendering={savedSettings.antiAliasing ? "geometricPrecision" : "crispEdges"}
              onPointerDown={handlePointerDown}
              onPointerMove={handlePointerMove}
              onPointerUp={handlePointerUp}
              onPointerLeave={handlePointerUp}
              onPointerCancel={handlePointerUp}
              onWheel={(e) => {
-                 const newZoom = Math.max(0.1, Math.min(5, zoom * (1 - e.deltaY * 0.001)));
-                 setZoom(newZoom);
+                 const d = e.deltaY;
+                 const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * (1 - d * 0.001)));
+                 setZoom(nextZoom);
                  
                  if (wheelTimeout.current) window.clearTimeout(wheelTimeout.current);
-                 wheelTimeout.current = window.setTimeout(() => {
-                     commitState({ radius, sides, extrude, pan, orbit, zoom: newZoom });
-                 }, 400);
+                 wheelTimeout.current = window.setTimeout(() => commitState({ zoom: nextZoom }), 400);
              }}
            >
-             {/* Origin/Axes */}
+             {/* Origin Grid */}
              {showGrid && (
-               <g className="opacity-40">
-                 <path d="M100 20 L100 180 M20 100 L180 100" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="2 2" />
-                 <circle cx="100" cy="100" r="1.5" fill="#3b82f6" />
+               <g className="opacity-[0.15]">
+                  <line x1="-1000" y1="100" x2="1000" y2="100" stroke="#3b82f6" strokeWidth={0.2 / zoom} strokeDasharray="1 1" />
+                  <line x1="100" y1="-1000" x2="100" y2="1000" stroke="#3b82f6" strokeWidth={0.2 / zoom} strokeDasharray="1 1" />
+                  <circle cx="100" cy="100" r="1.5" fill="#3b82f6" />
                </g>
              )}
 
-             {/* Manipulation Visual Indicators */}
+             {/* Drag Feedback Indicators */}
              {isDragging && (
-               <g opacity="0.6">
-                 {activeViewportTool === 'pan' && (
-                   <g transform={`translate(${100}, ${100})`}>
-                      <circle cx="0" cy="0" r="3" fill="none" stroke="#3b82f6" strokeWidth="0.5" />
-                      <path d="M-10 0 L10 0 M0 -10 L0 10" stroke="#3b82f6" strokeWidth="0.5" />
-                   </g>
-                 )}
-                 {activeViewportTool === 'zoom' && (
-                   <g transform={`translate(${100}, ${100})`}>
-                      <circle cx="0" cy="0" r={zoom * 10} fill="none" stroke="#3b82f6" strokeWidth="0.5" className="animate-pulse" />
-                      <circle cx="0" cy="0" r={zoom * 20} fill="none" stroke="#3b82f6" strokeWidth="0.2" opacity="0.3" />
-                   </g>
-                 )}
-                 {activeViewportTool === 'orbit' && (
-                   <g transform={`translate(${100}, ${100})`}>
-                      <circle cx="0" cy="0" r="50" fill="none" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="4 4" />
-                      <circle cx="0" cy="0" r="2" fill="#3b82f6" />
-                   </g>
-                 )}
+               <g className="pointer-events-none opacity-40">
+                  {activeViewportTool === 'pan' && (
+                    <g transform={`translate(${100}, ${100})`}>
+                       <circle cx="0" cy="0" r="4" fill="none" stroke="#3b82f6" strokeWidth="0.8" />
+                       <path d="M-50 0 L50 0 M0 -50 L0 50" stroke="#3b82f6" strokeWidth="0.2" strokeDasharray="2 2" className="animate-pulse" />
+                       <g transform="translate(6, -6)">
+                          <rect x="0" y="-8" width="40" height="10" fill="#09090b" stroke="#3b82f6" strokeWidth="0.2" rx="1" />
+                          <text x="4" y="-1" fontSize="5" fill="#3b82f6" fontWeight="bold">X:{pan.x.toFixed(1)} Y:{pan.y.toFixed(1)}</text>
+                       </g>
+                    </g>
+                  )}
+                  {activeViewportTool === 'zoom' && (
+                    <g transform={`translate(${100}, ${100})`}>
+                       <circle cx="0" cy="0" r={zoom * 12} fill="none" stroke="#3b82f6" strokeWidth="0.5" className="animate-pulse" />
+                    </g>
+                  )}
                </g>
              )}
 
-             {/* Mesh Rendering (Shaded) */}
+             {/* Mesh Render Layer */}
              <g>
                 {geometryData.faces.map((face, i) => (
                   <motion.path 
@@ -573,234 +612,131 @@ export function CADViewport() {
                     d={face.path}
                     fill={face.fill}
                     stroke={savedSettings.shading === "Wireframe" ? "rgba(59, 130, 246, 0.7)" : "rgba(255, 255, 255, 0.08)"}
-                    strokeWidth={savedSettings.shading === "Wireframe" ? currentStrokeWidth * 1.2 : currentStrokeWidth}
+                    strokeWidth={savedSettings.shading === "Wireframe" ? currentStrokeWidth * 1.5 : currentStrokeWidth}
                     strokeLinejoin="round"
                     className="transition-colors hover:stroke-blue-400 cursor-crosshair"
                   />
                 ))}
              </g>
 
-             {/* Sketch Base (Ghost) */}
-             <g className="text-blue-500/10">
-               <path d={geometryData.basePath} fill="none" stroke="currentColor" strokeWidth={currentStrokeWidth * 0.5} strokeDasharray="1 1" />
-             </g>
-
-             {/* Real-world Constraints Visualizer */}
-             <g className="text-emerald-400 text-[6px]">
-               {/* Radius dimension */}
-               <line x1="100" y1="120" x2={geometryData.projectedBase[0].x} y2={geometryData.projectedBase[0].y} stroke="currentColor" strokeWidth="0.5" />
-               <circle cx={100 + (geometryData.projectedBase[0].x - 100)/2} cy={120 + (geometryData.projectedBase[0].y - 120)/2} r="6" fill="#0d1117" stroke="currentColor" strokeWidth="0.5" />
-               <text x={100 + (geometryData.projectedBase[0].x - 100)/2} y={120 + (geometryData.projectedBase[0].y - 120)/2 + 2} textAnchor="middle" fill="currentColor">R{radius}</text>
-               
-               {/* Extrude height dimension */}
-               <line x1="180" y1="120" x2="180" y2={120 - extrude} stroke="#f59e0b" strokeWidth="0.5" strokeDasharray="1 1" />
-               <text x="185" y={120 - extrude/2 + 2} fill="#f59e0b">L{extrude}</text>
+             {/* Dynamic Annotations Layer */}
+             <g className="text-emerald-400 text-[5px] font-black opacity-60">
+                <line x1="100" y1="120" x2={geometryData.projectedBase[0].x} y2={geometryData.projectedBase[0].y} stroke="currentColor" strokeWidth="0.3" strokeDasharray="1 1" />
+                <text x={100 + (geometryData.projectedBase[0].x - 100)/2} y={120 + (geometryData.projectedBase[0].y - 120)/2 + 1.5} textAnchor="middle" fill="currentColor">R{radius}</text>
+                
+                <line x1="175" y1="120" x2="175" y2={120 - extrude} stroke="#f59e0b" strokeWidth="0.3" strokeDasharray="1 0.5" />
+                <text x="178" y={120 - extrude/2 + 1.5} fill="#f59e0b" className="font-bold">H{extrude}</text>
              </g>
            </svg>
 
-           {/* Viewport controls */}
-           <div className="absolute top-2 right-2 flex gap-1 z-10">
-             <button 
-               onClick={undo}
-               disabled={historyIndex === 0}
-               className={`px-1.5 py-1 bg-black/40 border border-white/10 rounded transition-colors ${historyIndex === 0 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:bg-white/10 text-white/60'}`}
-               title="Undo"
-             >
-               <Undo2 className="w-3 h-3" />
-             </button>
-             <button 
-               onClick={redo}
-               disabled={historyIndex === history.length - 1}
-               className={`px-1.5 py-1 bg-black/40 border border-white/10 rounded transition-colors ${historyIndex === history.length - 1 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:bg-white/10 text-white/60'}`}
-               title="Redo"
-             >
-               <Redo2 className="w-3 h-3" />
-             </button>
-             <div className="w-px h-5 bg-white/10 mx-1 self-center" />
-             <button 
-               onClick={() => setShowGrid(!showGrid)}
-               className={`px-1.5 py-1 ${showGrid ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-black/40 border-white/10 text-white/60 hover:bg-white/10'} border rounded cursor-pointer transition-colors`}
-               title={showGrid ? "Hide Grid" : "Show Grid"}
-             >
-               <Grid3X3 className="w-3 h-3" />
-             </button>
-             <div className="px-1.5 py-1 bg-black/40 border border-white/10 rounded cursor-pointer hover:bg-white/10 text-white/60 transition-colors">
-                  <Box className="w-3 h-3" />
-             </div>
-             <button 
-               onClick={handleOpenSettings}
-               className={`px-1.5 py-1 rounded cursor-pointer transition-all border ${isSettingsOpen ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-black/40 border-white/10 text-white/60 hover:bg-white/10'}`}
-               title={t("cad.render_settings")}
-             >
+           {/* Viewport Top Actions */}
+           <div className="absolute top-4 right-4 flex gap-1 z-10">
+              <ActionButton onClick={undo} disabled={historyIndex === 0} title="Undo">
+                 <Undo2 className="w-3 h-3" />
+              </ActionButton>
+              <ActionButton onClick={redo} disabled={historyIndex === history.length - 1} title="Redo">
+                 <Redo2 className="w-3 h-3" />
+              </ActionButton>
+              <div className="w-px h-4 bg-white/5 mx-1" />
+              <ToggleButton active={showGrid} onClick={() => setShowGrid(!showGrid)} title="Grid Toggle">
+                 <Grid3X3 className="w-3 h-3" />
+              </ToggleButton>
+              <ActionButton onClick={handleOpenSettings} active={isSettingsOpen} title="Config">
                  <Settings2 className="w-3 h-3" />
-             </button>
-             <button 
-               onClick={handleExport}
-               className="px-1.5 py-1 bg-black/40 border border-white/10 rounded cursor-pointer hover:bg-blue-500/20 hover:border-blue-500/50 hover:text-blue-400 text-white/60 transition-all shadow-sm"
-               title={t("cad.export")}
-             >
+              </ActionButton>
+              <ActionButton onClick={handleExport} variant="danger" title={t("cad.export")}>
                  <Download className="w-3 h-3" />
-             </button>
+              </ActionButton>
            </div>
 
-           {/* Navigation Toolbar */}
-           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center bg-[#0a0a0b] border border-white/10 rounded-full p-1 shadow-lg z-10 gap-1">
-             <button
-               onClick={() => setActiveViewportTool('orbit')}
-               className={`p-1.5 rounded-full transition-all duration-200 ${activeViewportTool === 'orbit' ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)] scale-110' : 'text-white/40 hover:text-white/90 hover:bg-white/10'}`}
-               title="Orbit"
-             >
-               <Orbit className="w-4 h-4" />
-             </button>
-             <button
-               onClick={() => setActiveViewportTool('pan')}
-               className={`p-1.5 rounded-full transition-all duration-200 ${activeViewportTool === 'pan' ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)] scale-110' : 'text-white/40 hover:text-white/90 hover:bg-white/10'}`}
-               title="Pan"
-             >
-               <Hand className="w-4 h-4" />
-             </button>
-             <button
-               onClick={() => setActiveViewportTool('zoom')}
-               className={`p-1.5 rounded-full transition-all duration-200 ${activeViewportTool === 'zoom' ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)] scale-110' : 'text-white/40 hover:text-white/90 hover:bg-white/10'}`}
-               title="Zoom"
-             >
-               <ZoomIn className="w-4 h-4" />
-             </button>
-           </div>
+           {/* Central Navigation Cluster */}
+           <ToolCluster 
+             active={activeViewportTool} 
+             onSelect={setActiveViewportTool} 
+             onResetPan={() => setPan({ x: 0, y: 0 })} 
+           />
 
-           {/* Render Settings Modal */}
+           {/* Settings Overlay */}
            <AnimatePresence>
-             {isSettingsOpen && (
-               <motion.div 
-                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                 className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-                 onClick={() => setIsSettingsOpen(false)}
-               >
-                 <motion.div 
-                   className="w-full max-w-sm bg-[#0a0a0b] border border-white/10 rounded shadow-2xl overflow-hidden flex flex-col"
-                   onClick={(e) => e.stopPropagation()}
-                 >
-                   {/* Header */}
-                   <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between bg-white/5">
-                     <div className="flex items-center gap-2">
-                       <Settings2 className="w-4 h-4 text-blue-400" />
-                       <span className="font-black text-[9px] uppercase tracking-widest text-white/90">{t("cad.render_settings")}</span>
-                     </div>
-                     <button 
-                       onClick={() => setIsSettingsOpen(false)}
-                       className="p-1 hover:bg-white/5 rounded text-white/40 hover:text-white transition-colors"
-                     >
-                       <X className="w-4 h-4" />
-                     </button>
-                   </div>
+              {isSettingsOpen && (
+                <motion.div 
+                  initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                  animate={{ opacity: 1, backdropFilter: 'blur(4px)' }}
+                  exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                  className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 p-6"
+                  onClick={() => setIsSettingsOpen(false)}
+                >
+                  <motion.div 
+                    initial={{ scale: 0.95, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.95, y: 20 }}
+                    className="w-full max-w-sm bg-[#0a0a0b] border border-white/10 rounded-2xl shadow-3xl overflow-hidden flex flex-col ring-1 ring-white/5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <header className="px-5 py-4 border-b border-white/5 flex items-center justify-between bg-white/2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-blue-500/10 rounded-lg border border-blue-500/20"><Settings2 className="w-4 h-4 text-blue-400" /></div>
+                        <span className="font-black text-[10px] uppercase tracking-[0.15em] text-white/90">Viewport Protocol</span>
+                      </div>
+                      <button onClick={() => setIsSettingsOpen(false)} className="p-1.5 hover:bg-white/5 rounded-full text-white/30 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
+                    </header>
 
-                   {/* Content */}
-                   <div className="p-5 space-y-6">
-                     {/* Resolution Slider */}
-                     <div className="space-y-3">
-                       <div className="flex justify-between items-center text-[8px] uppercase tracking-tighter">
-                         <span className="text-white/50">{t("cad.resolution") || "Output Resolution"}</span>
-                         <span className="text-blue-400 font-bold">{t(`cad.resolution_${tempSettings.resolution.toLowerCase()}`)}</span>
-                       </div>
-                       <div className="relative pt-4">
-                         <input 
-                           type="range" 
-                           min="0" 
-                           max="2" 
-                           step="1"
-                           value={['Low', 'Medium', 'High'].indexOf(tempSettings.resolution)}
-                           onChange={(e) => {
-                             const options: RenderSettings['resolution'][] = ['Low', 'Medium', 'High'];
-                             setTempSettings({...tempSettings, resolution: options[parseInt(e.target.value)]});
-                           }}
-                           className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                         />
-                         <div className="flex justify-between px-1 mt-2 text-[7px] text-white/30 uppercase">
-                           <span>{t("cad.resolution_low")}</span>
-                           <span>{t("cad.resolution_medium")}</span>
-                           <span>{t("cad.resolution_high")}</span>
-                         </div>
-                       </div>
-                     </div>
+                    <div className="p-6 space-y-8">
+                      <div className="space-y-4">
+                        <label className="text-[8px] text-white/30 uppercase font-bold tracking-widest">Projection Quality</label>
+                        <div className="flex bg-white/2 p-1 rounded-xl border border-white/5">
+                           {(['Low', 'Medium', 'High'] as const).map(res => (
+                             <button key={res} onClick={() => setTempSettings({ ...tempSettings, resolution: res })} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-lg transition-all ${tempSettings.resolution === res ? 'bg-blue-600 text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}>{res}</button>
+                           ))}
+                        </div>
+                      </div>
 
-                     {/* Anti-Aliasing Toggle */}
-                     <div className="flex items-center justify-between group">
-                       <div className="flex flex-col gap-0.5">
-                         <span className="text-[8px] uppercase tracking-tighter text-white/50">{t("cad.anti_aliasing") || "Anti-Aliasing"}</span>
-                         <span className="text-[7px] text-white/30">{t("cad.anti_aliasing_desc") || "Smooth vector rendering"}</span>
-                       </div>
-                       <label className="relative inline-flex items-center cursor-pointer">
-                         <input 
+                      <div className="space-y-4">
+                        <label className="text-[8px] text-white/30 uppercase font-bold tracking-widest">Shading Algorithm</label>
+                        <div className="grid grid-cols-2 gap-2">
+                           {(['Wireframe', 'Solid', 'Realistic', 'Stress'] as const).map(mode => (
+                             <button 
+                                key={mode} 
+                                onClick={() => setTempSettings({ ...tempSettings, shading: mode })}
+                                className={`py-3 px-4 text-[9px] font-bold uppercase rounded-xl border transition-all text-left flex items-center justify-between group ${tempSettings.shading === mode ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-black/40 border-white/5 text-white/30 hover:border-white/10 hover:text-white/60'}`}
+                             >
+                               {mode}
+                               {tempSettings.shading === mode && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
+                             </button>
+                           ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-white/2 rounded-2xl border border-white/5">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">Vector Smoothing</span>
+                          <span className="text-[7px] text-white/30">Enable high-fidelity anti-aliasing</span>
+                        </div>
+                        <input 
                            type="checkbox" 
-                           className="sr-only peer"
                            checked={tempSettings.antiAliasing}
-                           onChange={(e) => setTempSettings({...tempSettings, antiAliasing: e.target.checked})}
-                         />
-                         <div className="w-8 h-4 bg-white/5 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white/40 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600 peer-checked:after:bg-white"></div>
-                       </label>
-                     </div>
+                           onChange={e => setTempSettings({ ...tempSettings, antiAliasing: e.target.checked })}
+                           className="w-10 h-5 appearance-none bg-white/5 border border-white/10 rounded-full checked:bg-blue-600 transition-all cursor-pointer relative after:content-[''] after:absolute after:top-1 after:left-1 after:w-3 after:h-3 after:bg-white/20 after:rounded-full checked:after:translate-x-5 checked:after:bg-white after:transition-all"
+                        />
+                      </div>
+                    </div>
 
-                     {/* Shading Mode */}
-                     <div>
-                       <label className="text-[8px] text-white/40 uppercase mb-1.5 block">Shading Mode</label>
-                       <div className="flex flex-wrap gap-1">
-                         {(['Wireframe', 'Solid', 'Realistic', 'Stress'] as const).map(mode => (
-                           <button 
-                             key={mode}
-                             onClick={() => setTempSettings({...tempSettings, shading: mode})}
-                             className={`flex-1 py-1.5 text-[8px] uppercase rounded border transition-all ${tempSettings.shading === mode ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-white/2 border-white/5 text-white/40 hover:bg-white/5'}`}
-                           >
-                             {mode}
-                           </button>
-                         ))}
-                       </div>
-                     </div>
-
-                     {/* Output Format Dropdown */}
-                     <div className="space-y-2">
-                       <span className="text-[8px] uppercase tracking-tighter text-white/50">{t("cad.export_format") || "Export Format"}</span>
-                       <div className="flex flex-wrap gap-1">
-                         {(['PNG', 'JPG', 'STL', 'OBJ'] as const).map(fmt => (
-                            <button 
-                                key={fmt}
-                                onClick={() => setTempSettings({...tempSettings, outputFormat: fmt as any})}
-                                className={`flex-1 py-1.5 text-[8px] uppercase rounded border transition-all ${tempSettings.outputFormat === fmt ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-white/2 border-white/5 text-white/40 hover:bg-white/5'}`}
-                            >
-                                {fmt}
-                            </button>
-                         ))}
-                       </div>
-                     </div>
-                   </div>
-
-                   {/* Footer */}
-                   <div className="px-4 py-3 bg-white/5 border-t border-white/5 flex gap-2">
-                     <button 
-                       onClick={() => setIsSettingsOpen(false)}
-                       className="flex-1 px-3 py-2 rounded bg-white/5 border border-white/10 text-[9px] uppercase font-bold text-white/60 hover:bg-white/10 hover:text-white transition-all shadow-sm"
-                     >
-                       {t("cad.cancel") || "Cancel"}
-                     </button>
-                     <button 
-                       onClick={handleSaveSettings}
-                       className="flex-1 px-3 py-2 rounded bg-blue-600 border border-blue-500 text-[9px] uppercase font-bold text-white hover:bg-blue-500 transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] flex items-center justify-center gap-1.5"
-                     >
-                       <Check className="w-3 h-3" /> {t("cad.save") || "Save"}
-                     </button>
-                   </div>
-                 </motion.div>
-               </motion.div>
-             )}
+                    <footer className="px-5 py-5 border-t border-white/5 flex gap-3">
+                      <button onClick={() => setIsSettingsOpen(false)} className="flex-1 py-3 text-[9px] font-black tracking-widest uppercase rounded-xl border border-white/10 hover:bg-white/5 text-white/40 transition-colors">Discard</button>
+                      <button onClick={handleSaveSettings} className="flex-1 py-3 bg-blue-600 text-white text-[9px] font-black tracking-widest uppercase rounded-xl shadow-[0_10px_20px_-5px_rgba(37,99,235,0.4)] active:scale-95 transition-all">Apply_Settings</button>
+                    </footer>
+                  </motion.div>
+                </motion.div>
+              )}
            </AnimatePresence>
-        </div>
+        </main>
 
-        {/* Toolbar */}
-        <div className="w-12 bg-[#0a0a0b] border-l border-white/5 flex flex-col p-2 gap-2 shrink-0 items-center">
+        {/* Global Action Toolbar */}
+        <div className="w-12 bg-[#0d1117] border-l border-white/5 flex flex-col p-2.5 gap-3 shrink-0 items-center shadow-inner">
           <ToolIcon icon={MousePointer2} active />
           <ToolIcon icon={Compass} />
           <ToolIcon icon={Ruler} />
+          <div className="w-full h-px bg-white/5 my-1" />
           <ToolIcon icon={Layers} />
         </div>
       </div>
@@ -808,19 +744,116 @@ export function CADViewport() {
   );
 }
 
+// --- Internal Components ---
+
 function TreeItem({ name, icon: Icon, active }: { name: string, icon: any, active?: boolean }) {
   return (
-    <div className={`flex items-center gap-1.5 p-1 rounded-sm cursor-pointer transition-colors ${active ? 'bg-blue-500/20 text-blue-400 font-bold' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}>
-      <Icon className="w-2.5 h-2.5" />
-      <span className="text-[8px] truncate tracking-tight">{name}</span>
+    <div className={`group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${active ? 'bg-blue-500/10 text-blue-400 font-bold' : 'text-white/30 hover:text-white/60 hover:bg-white/2'}`}>
+      <Icon className={`w-3 h-3 ${active ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'}`} />
+      <span className="text-[9px] truncate tracking-tight">{name}</span>
     </div>
   );
 }
 
 function ToolIcon({ icon: Icon, active }: { icon: any, active?: boolean }) {
   return (
-    <div className={`p-1.5 rounded cursor-pointer transition-all ${active ? 'bg-blue-500 text-white shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'text-neutral-500 hover:text-white hover:bg-white/10'}`}>
-      <Icon className="w-3.5 h-3.5" />
-    </div>
+    <button className={`p-2 rounded-xl transition-all duration-300 ${active ? 'bg-blue-600 text-white shadow-lg scale-110' : 'text-white/20 hover:text-white/70 hover:bg-white/5'}`}>
+      <Icon className="w-4 h-4 stroke-[1.5px]" />
+    </button>
   );
+}
+
+function ParametricInput({ label, value, onChange, onCommit, min = 1, max = 500 }: { label: string, value: number, onChange: (v: number) => void, onCommit: () => void, min?: number, max?: number }) {
+  return (
+     <div className="flex flex-col gap-1 text-[8px] text-white/40 uppercase font-black tracking-widest mb-2">
+        <div className="flex justify-between items-center px-0.5">
+           <span>{label}</span>
+           <span className="text-white/20 text-[7px]">{value}mm</span>
+        </div>
+        <input 
+           type="number" 
+           value={value} 
+           onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value))))} 
+           onBlur={() => onCommit()} 
+           onKeyDown={e => e.key === 'Enter' && onCommit()} 
+           className="w-full bg-black/40 border border-white/5 hover:border-white/10 px-2 py-1.5 rounded-md text-right text-white/80 focus:outline-none focus:border-blue-500/50 transition-colors" 
+        />
+     </div>
+  );
+}
+
+function HUDItem({ icon: Icon, value, label, highlight }: { icon: any, value: string, label: string, highlight?: boolean }) {
+   return (
+      <div className="flex flex-col gap-0.5 min-w-[50px]">
+         <span className="text-[6px] text-white/20 uppercase font-black tracking-[0.1em]">{label}</span>
+         <div className="flex items-center gap-1.5">
+            <Icon className={`w-2.5 h-2.5 ${highlight ? 'text-blue-400' : 'text-white/40'}`} />
+            <span className={`text-[9px] font-mono select-none ${highlight ? 'text-blue-400/90 font-black' : 'text-white/60'}`}>{value}</span>
+         </div>
+      </div>
+   );
+}
+
+function ToolCluster({ active, onSelect, onResetPan }: { active: string, onSelect: (v: any) => void, onResetPan: () => void }) {
+   return (
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center bg-black/60 backdrop-blur-2xl border border-white/5 rounded-full p-1.5 shadow-3xl z-10 gap-2 ring-1 ring-white/5">
+        <NavButton active={active === 'orbit'} onClick={() => onSelect('orbit')} title="Orbit Mode">
+           <Orbit className="w-4 h-4" />
+        </NavButton>
+        <div className="relative group/pan">
+           <NavButton active={active === 'pan'} onClick={() => onSelect('pan')} onDoubleClick={onResetPan} title="Pan View (dbl-click to center)">
+              <Hand className="w-4 h-4" />
+           </NavButton>
+           {active === 'pan' && (
+              <button 
+                onClick={onResetPan} 
+                className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center text-white border-2 border-[#09090b] hover:scale-125 transition-transform"
+              >
+                <X className="w-2 h-2 stroke-[3px]" />
+              </button>
+           )}
+        </div>
+        <NavButton active={active === 'zoom'} onClick={() => onSelect('zoom')} title="Zoom Adjustment">
+           <ZoomIn className="w-4 h-4" />
+        </NavButton>
+      </div>
+   );
+}
+
+function NavButton({ children, active, onClick, onDoubleClick, title }: { children: React.ReactNode, active: boolean, onClick: () => void, onDoubleClick?: () => void, title: string }) {
+   return (
+      <button
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        className={`p-2 rounded-full transition-all duration-300 ${active ? 'bg-blue-600 text-white shadow-lg ring-4 ring-blue-500/20 scale-110' : 'text-white/30 hover:text-white/80 hover:bg-white/5'}`}
+        title={title}
+      >
+        {children}
+      </button>
+   );
+}
+
+function ActionButton({ children, onClick, disabled, active, variant, title }: { children: React.ReactNode, onClick: () => void, disabled?: boolean, active?: boolean, variant?: 'danger', title?: string }) {
+   return (
+      <button 
+         onClick={onClick} 
+         disabled={disabled}
+         className={`p-2 border rounded-xl transition-all ${disabled ? 'opacity-20 cursor-not-allowed' : active ? 'bg-blue-500/20 border-blue-500 text-blue-400' : variant === 'danger' ? 'bg-red-500/5 border-red-500/20 text-red-400 hover:bg-red-500/20 hover:border-red-500/50' : 'bg-black/40 border-white/10 text-white/40 hover:bg-white/5 hover:text-white hover:border-white/20 shadow-lg active:scale-95'}`}
+         title={title}
+      >
+         {children}
+      </button>
+   );
+}
+
+function ToggleButton({ children, active, onClick, title }: { children: React.ReactNode, active: boolean, onClick: () => void, title: string }) {
+   return (
+      <button 
+         onClick={onClick} 
+         className={`p-2 border rounded-xl transition-all ${active ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-black/40 border-white/10 text-white/30 hover:bg-white/5'}`}
+         title={title}
+      >
+         {children}
+      </button>
+   );
 }
