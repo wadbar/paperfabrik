@@ -36,6 +36,7 @@ export function CADViewport() {
   const [orbit, setOrbit] = useState({ rx: 0, ry: 0 });
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
+  const [gridSize, setGridSize] = useState(25);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
 
@@ -117,7 +118,9 @@ export function CADViewport() {
   };
 
   const runSimulation = async () => {
+    if (isSimulating) return;
     setIsSimulating(true);
+    setSimResult(null);
     recordEvent("CAD_SIMULATION_START");
     
     try {
@@ -235,13 +238,18 @@ export function CADViewport() {
     const origin = { x: 100, y: 120 };
     const lightDir = new Vector3(1, -1, 1).normalize();
 
+    const cosRX = Math.cos(orbit.rx);
+    const sinRX = Math.sin(orbit.rx);
+    const cosRY = Math.cos(orbit.ry);
+    const sinRY = Math.sin(orbit.ry);
+
     const rotateV = (v: Vector3) => {
         // RotX
-        let y1 = v.y * Math.cos(orbit.rx) - v.z * Math.sin(orbit.rx);
-        let z1 = v.y * Math.sin(orbit.rx) + v.z * Math.cos(orbit.rx);
+        let y1 = v.y * cosRX - v.z * sinRX;
+        let z1 = v.y * sinRX + v.z * cosRX;
         // RotY
-        let x2 = v.x * Math.cos(orbit.ry) + z1 * Math.sin(orbit.ry);
-        let z2 = -v.x * Math.sin(orbit.ry) + z1 * Math.cos(orbit.ry);
+        let x2 = v.x * cosRY + z1 * sinRY;
+        let z2 = -v.x * sinRY + z1 * cosRY;
         return new Vector3(x2, y1, z2);
     };
 
@@ -249,8 +257,9 @@ export function CADViewport() {
     // To do this we first calculate rotated coordinates for all vertices to find the average Z of each face.
     const rotatedVertices = mesh.vertices.map((v, idx) => {
         let displacedV = v;
-        if (simResult && savedSettings.shading === "Stress") {
-             displacedV = v.add(simResult.vertexDisplacements[idx].mul(10)); 
+        if (simResult && (savedSettings.shading === "Stress" || isSimulating)) {
+             // Factor in displacement for visualization (exaggerated for effect)
+             displacedV = v.add(simResult.vertexDisplacements[idx].mul(15)); 
         }
         return rotateV(displacedV);
     });
@@ -274,13 +283,26 @@ export function CADViewport() {
       const intensity = face.rotatedNormal ? Math.max(0.15, face.rotatedNormal.dot(lightDir)) : 0.4;
       
       let fill = `rgba(59, 130, 246, ${intensity * 0.9})`;
-      if (savedSettings.shading === "Stress" && simResult) {
-          const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / face.indices.length;
-          const t = (avgStress - simResult.minStress) / (simResult.maxStress - simResult.minStress || 1);
-          const r = Math.floor(t * 255);
-          const g = Math.floor((1 - t) * 150);
-          const b = Math.floor((1 - t) * 255);
-          fill = `rgba(${r}, ${g}, ${b}, ${intensity * 1.5})`;
+      if (savedSettings.shading === "Realistic") {
+          const spec = Math.pow(intensity, 4);
+          const baseColor = 100 + intensity * 60;
+          const r = Math.min(255, baseColor + spec * 100);
+          const g = Math.min(255, baseColor + 5 + spec * 100);
+          const b = Math.min(255, baseColor + 15 + spec * 100);
+          fill = `rgba(${r.toFixed(0)}, ${g.toFixed(0)}, ${b.toFixed(0)}, 0.98)`;
+      } else if (savedSettings.shading === "Stress") {
+          if (simResult) {
+            const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / face.indices.length;
+            const t = (avgStress - simResult.minStress) / (simResult.maxStress - simResult.minStress || 1);
+            // HSL Gradient: Blue (240) to Red (0)
+            const hue = Math.max(0, 240 - (t * 240));
+            fill = `hsla(${hue.toFixed(0)}, 85%, 50%, ${0.6 + intensity * 0.4})`;
+          } else {
+            // Fallback if Stress mode selected but no result
+            fill = `rgba(100, 100, 100, ${intensity * 0.5})`;
+          }
+      } else if (savedSettings.shading === "Wireframe") {
+          fill = "#0d1117"; // Match background for Hidden Line Removal (HLR)
       }
 
       return {
@@ -319,11 +341,25 @@ export function CADViewport() {
              <div className="flex flex-col gap-1 text-[8px] text-white/70">
                 <div className="flex justify-between items-center">
                    <span className="flex items-center gap-1"><Link className="w-2 h-2"/> Radius</span>
-                   <input type="number" value={radius} onChange={e => setRadius(Number(e.target.value))} onBlur={commitState} onKeyDown={e => e.key === 'Enter' && commitState()} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
+                   <input 
+                      type="number" 
+                      value={radius} 
+                      onChange={e => setRadius(Math.max(1, Number(e.target.value)))} 
+                      onBlur={commitState} 
+                      onKeyDown={e => e.key === 'Enter' && commitState()} 
+                      className="w-10 bg-black/40 border border-white/10 hover:border-blue-500/50 px-1 rounded text-right focus:outline-none focus:border-blue-500 transition-colors" 
+                   />
                 </div>
                 <div className="flex justify-between items-center">
                    <span className="flex items-center gap-1"><Link className="w-2 h-2"/> Sides</span>
-                   <input type="number" value={sides} onChange={e => setSides(Number(e.target.value))} min={3} max={12} onBlur={commitState} onKeyDown={e => e.key === 'Enter' && commitState()} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
+                   <input 
+                      type="number" 
+                      value={sides} 
+                      onChange={e => setSides(Math.min(32, Math.max(3, Number(e.target.value))))} 
+                      onBlur={commitState} 
+                      onKeyDown={e => e.key === 'Enter' && commitState()} 
+                      className="w-10 bg-black/40 border border-white/10 hover:border-blue-500/50 px-1 rounded text-right focus:outline-none focus:border-blue-500 transition-colors" 
+                   />
                 </div>
              </div>
           </div>
@@ -334,7 +370,14 @@ export function CADViewport() {
              <div className="flex flex-col gap-1 text-[8px] text-white/70">
                 <div className="flex justify-between items-center">
                    <span className="flex items-center gap-1"><Box className="w-2 h-2"/> Length</span>
-                   <input type="number" value={extrude} onChange={e => setExtrude(Number(e.target.value))} onBlur={commitState} onKeyDown={e => e.key === 'Enter' && commitState()} className="w-10 bg-black border border-blue-500/30 px-1 rounded text-right focus:outline-none focus:border-blue-500" />
+                   <input 
+                      type="number" 
+                      value={extrude} 
+                      onChange={e => setExtrude(Math.max(1, Number(e.target.value)))} 
+                      onBlur={commitState} 
+                      onKeyDown={e => e.key === 'Enter' && commitState()} 
+                      className="w-10 bg-black/40 border border-white/10 hover:border-blue-500/50 px-1 rounded text-right focus:outline-none focus:border-blue-500 transition-colors" 
+                   />
                 </div>
              </div>
           </div>
@@ -405,8 +448,71 @@ export function CADViewport() {
         {/* CAD Canvas */}
         <div className="flex-1 relative bg-[#0d1117] flex items-center justify-center overflow-hidden">
            {showGrid && (
-             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: `${gridSize}px ${gridSize}px` }} />
            )}
+           
+           {/* Navigation HUD */}
+           <div className="absolute bottom-4 left-4 pointer-events-none flex flex-col gap-2">
+              <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-lg p-2 px-3 flex flex-col gap-1 shadow-2xl">
+                <div className="flex items-center justify-between gap-6">
+                  <span className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Navigation HUD</span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isDragging ? 'bg-blue-500 animate-pulse' : 'bg-white/20'}`} />
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  <div className="flex items-center gap-1.5 transition-all">
+                    <ZoomIn className="w-2.5 h-2.5 text-blue-400/60" />
+                    <span className="text-[10px] font-mono text-white/80 select-none tracking-tight">{Math.round(zoom * 100)}%</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Hand className="w-2.5 h-2.5 text-blue-400/60" />
+                    <span className="text-[9px] font-mono text-white/50 select-none overflow-hidden text-ellipsis whitespace-nowrap max-w-[50px]">{pan.x.toFixed(0)},{pan.y.toFixed(0)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Orbit className="w-2.5 h-2.5 text-blue-400/60" />
+                    <span className="text-[9px] font-mono text-white/50 select-none">{(orbit.ry * 57.3).toFixed(0)}°</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Layers className="w-2.5 h-2.5 text-blue-400/60" />
+                    <span className="text-[8px] font-mono text-blue-400/80 select-none uppercase tracking-tighter truncate max-w-[45px]">{savedSettings.shading}</span>
+                  </div>
+                </div>
+                {savedSettings.shading === "Stress" && simResult && (
+                   <div className="mt-2 pt-2 border-t border-white/5 space-y-1">
+                      <div className="flex justify-between items-center text-[7px] text-white/40 uppercase tracking-widest font-black">
+                         <span>Low</span>
+                         <span>Stress Legend</span>
+                         <span>High</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-green-400 via-yellow-400 to-red-500 rounded-full" />
+                   </div>
+                )}
+                <div className="mt-1 pt-1 border-t border-white/5 flex items-center justify-between">
+                   <div className="flex flex-col">
+                      <div className="w-10 h-0.5 bg-blue-500/40 relative">
+                         <div className="absolute top-0 left-0 w-0.5 h-1 bg-blue-500/40 -translate-y-1/2" />
+                         <div className="absolute top-0 right-0 w-0.5 h-1 bg-blue-500/40 -translate-y-1/2" />
+                      </div>
+                      <span className="text-[6px] text-white/20 uppercase tracking-widest mt-0.5">Scale: {Math.round(10/zoom)}mm</span>
+                   </div>
+                   <span className="text-[6px] text-white/20 uppercase tracking-widest">Grid: {gridSize}mm</span>
+                </div>
+              </div>
+           </div>
+
+           {/* Orientation Gizmo (Compass) */}
+           <div className="absolute bottom-4 right-4 w-16 h-16 pointer-events-none opacity-60">
+              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
+                <g transform={`translate(50, 50) rotate(${orbit.ry * 57.3}) scale(${Math.cos(orbit.rx)})`}>
+                   <circle cx="0" cy="0" r="40" fill="none" stroke="white" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.2" />
+                   {/* X Axis */}
+                   <line x1="0" y1="0" x2="35" y2="0" stroke="#ef4444" strokeWidth="1.5" />
+                   <text x="40" y="4" fontSize="12" fill="#ef4444" fontWeight="bold" textAnchor="middle">X</text>
+                   {/* Y Axis (actually mapped to Z in most CAD, but Y in 2D space) */}
+                   <line x1="0" y1="0" x2="0" y2="-35" stroke="#22c55e" strokeWidth="1.5" />
+                   <text x="0" y="-40" fontSize="12" fill="#22c55e" fontWeight="bold" textAnchor="middle">Y</text>
+                </g>
+              </svg>
+           </div>
            
            <svg 
              className={`w-full h-full text-blue-400 ${activeViewportTool === 'zoom' ? (isDragging ? 'cursor-ns-resize' : 'cursor-zoom-in') : activeViewportTool === 'pan' || activeViewportTool === 'orbit' ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
@@ -435,16 +541,41 @@ export function CADViewport() {
                </g>
              )}
 
+             {/* Manipulation Visual Indicators */}
+             {isDragging && (
+               <g opacity="0.6">
+                 {activeViewportTool === 'pan' && (
+                   <g transform={`translate(${100}, ${100})`}>
+                      <circle cx="0" cy="0" r="3" fill="none" stroke="#3b82f6" strokeWidth="0.5" />
+                      <path d="M-10 0 L10 0 M0 -10 L0 10" stroke="#3b82f6" strokeWidth="0.5" />
+                   </g>
+                 )}
+                 {activeViewportTool === 'zoom' && (
+                   <g transform={`translate(${100}, ${100})`}>
+                      <circle cx="0" cy="0" r={zoom * 10} fill="none" stroke="#3b82f6" strokeWidth="0.5" className="animate-pulse" />
+                      <circle cx="0" cy="0" r={zoom * 20} fill="none" stroke="#3b82f6" strokeWidth="0.2" opacity="0.3" />
+                   </g>
+                 )}
+                 {activeViewportTool === 'orbit' && (
+                   <g transform={`translate(${100}, ${100})`}>
+                      <circle cx="0" cy="0" r="50" fill="none" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="4 4" />
+                      <circle cx="0" cy="0" r="2" fill="#3b82f6" />
+                   </g>
+                 )}
+               </g>
+             )}
+
              {/* Mesh Rendering (Shaded) */}
              <g>
                 {geometryData.faces.map((face, i) => (
                   <motion.path 
                     key={i}
                     d={face.path}
-                    fill={savedSettings.shading !== "Wireframe" ? face.fill : "none"}
-                    stroke={savedSettings.shading === "Wireframe" ? "rgba(59, 130, 246, 0.5)" : "rgba(255, 255, 255, 0.05)"}
-                    strokeWidth={currentStrokeWidth}
-                    className="transition-colors hover:fill-blue-500/50 cursor-crosshair"
+                    fill={face.fill}
+                    stroke={savedSettings.shading === "Wireframe" ? "rgba(59, 130, 246, 0.7)" : "rgba(255, 255, 255, 0.08)"}
+                    strokeWidth={savedSettings.shading === "Wireframe" ? currentStrokeWidth * 1.2 : currentStrokeWidth}
+                    strokeLinejoin="round"
+                    className="transition-colors hover:stroke-blue-400 cursor-crosshair"
                   />
                 ))}
              </g>
