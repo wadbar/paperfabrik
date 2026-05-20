@@ -39,46 +39,46 @@ export function FabricationPanel({
       animate={{ opacity: 1 }}
       onMouseEnter={() => recordEvent("PANEL_FOCUS_GAIN")}
       className={cn(
-        "bg-[#0a0a0b] relative flex h-full overflow-hidden border border-transparent hover:border-studio-border/30 transition-colors",
+        "bg-studio-panel relative flex h-full overflow-hidden border border-studio-border/50",
         className
       )}
     >
       {/* Side Icon Strip */}
-      <div className="w-12 border-r border-studio-dots flex flex-col items-center py-4 gap-4 opacity-70 shrink-0">
-        <div className={cn("p-2 rounded-md border", accentBg, accentColor)}>
-          <Icon className="w-5 h-5" />
+      <div className="w-16 border-r border-studio-border/50 flex flex-col items-center py-6 gap-6 shrink-0 bg-studio-bg/50">
+        <div className={cn("p-3 rounded-2xl md-elevation-1", accentBg, accentColor)}>
+          <Icon className="w-6 h-6" />
         </div>
         <div 
           onClick={() => recordEvent("TOOL_ACCESS", { tool: "LINE_PATH" })}
-          className="p-2 text-studio-muted hover:text-white transition-colors cursor-pointer"
+          className="p-3 text-studio-muted hover:text-studio-text hover:bg-studio-dots rounded-xl transition-all cursor-pointer"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
           </svg>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col p-3 overflow-hidden">
-        <div className="flex justify-between items-center mb-2 shrink-0">
-          <h2 className={cn("text-[11px] font-bold uppercase tracking-widest flex items-center gap-2", accentColor)}>
-            {id_num}. {title} 
-            <span className="text-[9px] opacity-40 font-normal italic lowercase">{filename}</span>
+      <div className="flex-1 flex flex-col p-6 overflow-hidden">
+        <div className="flex justify-between items-center mb-6 shrink-0">
+          <h2 className={cn("text-lg font-bold flex items-center gap-3", accentColor)}>
+            {title} 
+            <span className="text-sm text-studio-muted font-normal tracking-wide px-3 py-1 bg-studio-dots rounded-full">{filename}</span>
           </h2>
           {actionText && (
             <button 
               onClick={handleAction}
-              className={cn("px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors shrink-0", 
-              id_num === "01" ? "bg-studio-accent hover:bg-blue-500 text-white" : 
-              id_num === "03" ? "bg-emerald-700 hover:bg-emerald-600 text-white" :
-              id_num === "04" ? "bg-fuchsia-700 hover:bg-fuchsia-600 text-white" : 
-              "border border-amber-500/50 text-amber-500")}>
+              className={cn("px-6 py-2 text-sm font-semibold rounded-full uppercase transition-all md-elevation-1 hover:md-elevation-2 active:scale-95 shrink-0", 
+              id_num === "01" ? "bg-studio-accent text-white" : 
+              id_num === "03" ? "bg-pack-accent text-white" :
+              id_num === "04" ? "bg-apparel-accent text-white" : 
+              "border-2 border-wood-accent text-wood-accent hover:bg-wood-accent hover:text-white")}>
               {actionText}
             </button>
           )}
         </div>
         
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 bg-studio-bg rounded-2xl border border-studio-border/50 overflow-hidden">
           {children}
         </div>
       </div>

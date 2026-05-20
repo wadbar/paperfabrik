@@ -48,7 +48,7 @@ export default function App() {
   const ActiveComponent = activeTool.component;
 
   return (
-    <div className="flex h-screen w-full bg-studio-bg overflow-hidden selection:bg-studio-accent/30 selection:text-studio-accent font-mono">
+    <div className="flex h-screen w-full bg-studio-bg overflow-hidden selection:bg-studio-accent/30 selection:text-studio-accent font-sans">
       <Sidebar />
       <TerminalOverlay />
       <AIChatPanel isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />
@@ -56,13 +56,13 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header onOpenAI={() => setIsAIChatOpen(true)} />
         
-        <main className="flex-1 flex overflow-hidden bg-studio-dots">
+        <main className="flex-1 flex overflow-hidden bg-studio-bg">
           {/* Internal Explorer Sidebar */}
-          <div className="w-56 shrink-0 bg-[#0a0a0b] border-r border-white/5 flex flex-col pt-3">
-             <div className="px-4 pb-2 mb-2 border-b border-white/5 text-[9px] uppercase font-black tracking-widest text-white/40">
+          <div className="w-64 shrink-0 bg-studio-panel border-r border-studio-border flex flex-col pt-4">
+             <div className="px-6 pb-4 mb-2 border-b border-studio-border text-xs uppercase font-bold tracking-wider text-studio-muted">
                 Workspaces
              </div>
-             <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+             <div className="flex-1 overflow-y-auto px-3 space-y-1">
                {toolsConfig.map((tool) => {
                  const isActive = activeToolId === tool.id;
                  const Icon = tool.icon;
@@ -71,25 +71,25 @@ export default function App() {
                      key={tool.id}
                      onClick={() => setActiveToolId(tool.id)}
                      className={cn(
-                       "w-full flex items-center justify-between px-3 py-2 text-[10px] uppercase font-bold rounded transition-all",
-                       isActive ? "bg-white/10 text-white cursor-default" : "text-white/40 hover:bg-white/5 hover:text-white/80 cursor-pointer"
+                       "w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-xl transition-all",
+                       isActive ? "bg-studio-accent/10 text-studio-accent cursor-default" : "text-studio-muted hover:bg-studio-dots hover:text-studio-text cursor-pointer"
                      )}
                    >
-                     <div className="flex items-center gap-2.5">
-                        <Icon className={cn("w-3.5 h-3.5", isActive ? tool.color : "opacity-50")} />
+                     <div className="flex items-center gap-3">
+                        <Icon className={cn("w-5 h-5", isActive ? tool.color : "opacity-70")} />
                         <span className="truncate">{t(tool.titleKey) || tool.fallbackTitle}</span>
                      </div>
-                     {isActive && <ChevronRight className="w-3.5 h-3.5 opacity-50" />}
+                     {isActive && <ChevronRight className="w-4 h-4 opacity-70" />}
                    </button>
                  );
                })}
              </div>
-             <div className="p-2 border-t border-white/5 bg-black/20">
+             <div className="p-4 border-t border-studio-border bg-studio-bg">
                <SystemHealthMonitor />
              </div>
           </div>
 
-          <div className="flex-1 flex flex-col min-h-full p-2 h-full overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-full p-4 h-full overflow-hidden">
             <FabricationPanel 
               id_num={activeTool.id_num}
               title={t(activeTool.titleKey) || activeTool.fallbackTitle} 
@@ -98,7 +98,7 @@ export default function App() {
               accentColor={activeTool.color}
               accentBg={activeTool.bg}
               actionText={t(activeTool.actionKey) || activeTool.fallbackAction || "EXECUTE"}
-              className="h-full"
+              className="h-full rounded-2xl md-elevation-1"
             >
               <ActiveComponent />
             </FabricationPanel>
@@ -106,15 +106,15 @@ export default function App() {
         </main>
 
         {/* Footer Status Bar */}
-        <footer className="h-8 bg-studio-panel border-t border-studio-border flex items-center justify-between px-4 shrink-0 text-[9px] font-mono tracking-wider text-white/40">
-          <div className="flex gap-6">
+        <footer className="h-10 bg-studio-panel border-t border-studio-border flex items-center justify-between px-6 shrink-0 text-xs font-mono tracking-wide text-studio-muted">
+          <div className="flex gap-8">
             <PerformanceMetric label="RAM" value={12.4} max={64} unit="MB" color="text-3d-accent" api="/api/system/stats" />
             <PerformanceMetric label="CPU" value={82} max={100} unit="%" color="text-wood-accent" api="/api/system/stats" />
             <PerformanceMetric label="NET" value={1.2} max={10} unit="GBPS" color="text-pack-accent" />
           </div>
-          <div className="flex gap-4">
-             <span className="text-white/80 font-bold uppercase tracking-widest animate-pulse">READY FOR FABRICATION</span>
-             <span className="text-studio-accent opacity-60">AUTO-SAVE: 10s AGO</span>
+          <div className="flex gap-6 items-center">
+             <span className="text-studio-text font-semibold uppercase tracking-wider animate-pulse">READY</span>
+             <span className="text-studio-accent opacity-80">AUTO-SAVE: 10s AGO</span>
           </div>
         </footer>
       </div>

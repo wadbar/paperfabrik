@@ -3,8 +3,8 @@ import { cn } from "@/src/lib/utils";
 
 export function Sidebar() {
   return (
-    <aside className="w-12 bg-studio-panel border-r border-studio-border flex flex-col items-center py-4 gap-6 shrink-0 z-50">
-      <div className="w-8 h-8 bg-studio-accent rounded flex items-center justify-center text-white font-black text-xs">
+    <aside className="w-16 md:w-20 bg-studio-panel border-r border-studio-border flex flex-col items-center py-6 gap-8 shrink-0 z-50">
+      <div className="w-10 h-10 bg-studio-accent rounded-xl flex items-center justify-center text-white font-black text-sm elevation-1">
         PF
       </div>
       
@@ -18,7 +18,7 @@ export function Sidebar() {
 
       <div className="flex flex-col gap-4 mt-auto">
         <SidebarItem icon={Settings} />
-        <div className="w-7 h-7 rounded-full bg-studio-accent/20 border border-studio-accent/30 flex items-center justify-center font-bold text-[8px] text-studio-accent">
+        <div className="w-10 h-10 rounded-full bg-studio-accent/20 border border-studio-accent/30 flex items-center justify-center font-bold text-xs text-studio-accent hover:bg-studio-accent/30 transition-colors cursor-pointer">
           WB
         </div>
       </div>
@@ -29,10 +29,11 @@ export function Sidebar() {
 function SidebarItem({ icon: Icon, active }: { icon: any, active?: boolean }) {
   return (
     <div className={cn(
-      "w-8 h-8 flex items-center justify-center rounded transition-all cursor-pointer",
-      active ? "bg-studio-accent text-white" : "text-studio-muted hover:text-white hover:bg-white/5"
+      "w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group",
+      active ? "bg-studio-accent/20 text-studio-accent" : "text-studio-muted hover:text-studio-text hover:bg-studio-dots"
     )}>
-      <Icon className="w-4 h-4" />
+      {active && <div className="absolute inset-0 bg-studio-accent opacity-10 rounded-2xl" />}
+      <Icon className={cn("w-6 h-6", active && "scale-110")} />
     </div>
   );
 }

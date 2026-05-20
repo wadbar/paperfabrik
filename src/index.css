@@ -1,34 +1,81 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Roboto", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-studio-bg: #050505;
-  --color-studio-panel: #0d0d0f;
-  --color-studio-border: #262629;
-  --color-studio-dots: #1f1f23;
-  --color-studio-accent: #2563eb;
-  --color-studio-text: #d1d5db;
-  --color-studio-muted: #6b7280;
+  --color-studio-bg: var(--md-sys-color-background);
+  --color-studio-panel: var(--md-sys-color-surface-container);
+  --color-studio-border: var(--md-sys-color-outline-variant);
+  --color-studio-dots: var(--md-sys-color-surface);
+  --color-studio-accent: var(--md-sys-color-primary);
+  --color-studio-text: var(--md-sys-color-on-background);
+  --color-studio-muted: var(--md-sys-color-on-surface-variant);
   
-  --color-3d-accent: #3b82f6;
-  --color-wood-accent: #f59e0b;
-  --color-pack-accent: #10b981;
-  --color-apparel-accent: #d946ef;
+  --color-3d-accent: var(--md-sys-color-3d);
+  --color-wood-accent: var(--md-sys-color-wood);
+  --color-pack-accent: var(--md-sys-color-pack);
+  --color-apparel-accent: var(--md-sys-color-apparel);
 }
 
 @layer base {
+  :root {
+    /* MD3 Light Theme */
+    --md-sys-color-primary: #006494;
+    --md-sys-color-on-primary: #ffffff;
+    --md-sys-color-primary-container: #cbe6ff;
+    --md-sys-color-on-primary-container: #001e30;
+    --md-sys-color-secondary: #50606e;
+    --md-sys-color-background: #fcfcff;
+    --md-sys-color-on-background: #1a1c1e;
+    --md-sys-color-surface: #fcfcff;
+    --md-sys-color-surface-container: #f0f4f9;
+    --md-sys-color-surface-container-high: #e1e7ed;
+    --md-sys-color-on-surface: #1a1c1e;
+    --md-sys-color-on-surface-variant: #42474e;
+    --md-sys-color-outline: #72777f;
+    --md-sys-color-outline-variant: #c2c7cf;
+
+    --md-sys-color-3d: #006493;
+    --md-sys-color-wood: #7d5700;
+    --md-sys-color-pack: #006c4b;
+    --md-sys-color-apparel: #9a25b1;
+  }
+
+  .dark {
+    /* MD3 Dark Theme */
+    --md-sys-color-primary: #8ecdff;
+    --md-sys-color-on-primary: #003450;
+    --md-sys-color-primary-container: #004b71;
+    --md-sys-color-on-primary-container: #cbe6ff;
+    --md-sys-color-secondary: #b7c8d9;
+    --md-sys-color-background: #1a1c1e;
+    --md-sys-color-on-background: #e2e2e5;
+    --md-sys-color-surface: #1a1c1e;
+    --md-sys-color-surface-container: #202428;
+    --md-sys-color-surface-container-high: #2b2f33;
+    --md-sys-color-on-surface: #e2e2e5;
+    --md-sys-color-on-surface-variant: #c2c7cf;
+    --md-sys-color-outline: #8c9198;
+    --md-sys-color-outline-variant: #42474e;
+
+    --md-sys-color-3d: #8ecdff;
+    --md-sys-color-wood: #f5b021;
+    --md-sys-color-pack: #52dbac;
+    --md-sys-color-apparel: #f0a3ff;
+  }
+
   body {
     background-color: var(--color-studio-bg);
     color: var(--color-studio-text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
-/* Custom scrollbar for dark mode */
+/* Custom scrollbar for MD3 */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

@@ -1,54 +1,74 @@
-import { Activity, Bell, ChevronDown, Monitor, Search, Share2, Globe, Brain } from "lucide-react";
+import { Activity, Bell, ChevronDown, Monitor, Search, Share2, Globe, Brain, Moon, Sun } from "lucide-react";
 import { useI18n } from "../lib/i18n";
+import { useState, useEffect } from "react";
 
 export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
   const { language, setLanguage, t } = useI18n();
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
 
   const toggleLanguage = () => {
     setLanguage(language === 'en' ? 'pt' : 'en');
   };
 
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+  };
+
   return (
-    <header className="h-12 bg-studio-panel border-b border-studio-border flex items-center justify-between px-4 shrink-0">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-studio-accent rounded flex items-center justify-center">
-            <div className="w-3 h-3 border-2 border-white rotate-45"></div>
+    <header className="h-16 bg-studio-panel border-b border-studio-border flex items-center justify-between px-6 shrink-0 md-elevation-1">
+      <div className="flex items-center gap-8">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-studio-accent rounded-full flex items-center justify-center elevation-2">
+            <div className="w-4 h-4 border-[2.5px] border-white rotate-45"></div>
           </div>
-          <span className="text-lg font-black tracking-tighter text-white uppercase">
-            {t('app.title')} <span className="text-studio-accent text-[10px] align-top font-normal ml-1">PRO v4.2</span>
+          <span className="text-xl font-bold tracking-tight text-studio-text">
+            {t('app.title')} <span className="text-studio-accent text-xs align-top font-medium ml-1 bg-studio-accent/10 px-2 py-0.5 rounded-full">PRO v4.3</span>
           </span>
         </div>
-        <nav className="flex gap-4 text-[10px] uppercase tracking-widest font-bold opacity-60">
-          <span className="text-studio-accent">Workspace</span>
-          <span className="hover:text-white transition-colors cursor-pointer">{t('nav.libraries') || 'Libraries'}</span>
-          <span className="hover:text-white transition-colors cursor-pointer">{t('nav.machine_queue') || 'Machine Queue'}</span>
-          <span className="hover:text-white transition-colors cursor-pointer">{t('nav.cloud_sync') || 'Cloud Sync'}</span>
+        <nav className="hidden md:flex gap-6 text-sm font-medium opacity-80">
+          <span className="text-studio-accent font-bold">Workspace</span>
+          <span className="hover:text-studio-text transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-studio-dots/50">{t('nav.libraries') || 'Libraries'}</span>
+          <span className="hover:text-studio-text transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-studio-dots/50">{t('nav.machine_queue') || 'Machine Queue'}</span>
+          <span className="hover:text-studio-text transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-studio-dots/50">{t('nav.cloud_sync') || 'Cloud Sync'}</span>
         </nav>
       </div>
 
-      <div className="flex items-center gap-4 text-[10px] uppercase tracking-widest font-bold">
+      <div className="flex items-center gap-4 text-sm font-medium">
         <button 
            onClick={onOpenAI}
-           className="flex items-center gap-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-md border border-purple-500/20 transition-all group"
+           className="flex items-center gap-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 px-4 py-2 rounded-full border border-purple-500/20 transition-all group"
         >
-          <Brain className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+          <Brain className="w-4 h-4 group-hover:scale-110 transition-transform" />
           <span>AI COMPUTE</span>
         </button>
 
         <button 
-          onClick={toggleLanguage}
-          className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity"
+          onClick={toggleTheme}
+          className="w-10 h-10 flex items-center justify-center rounded-full text-studio-muted hover:text-studio-text hover:bg-studio-dots transition-all"
+          aria-label="Toggle Theme"
         >
-          <Globe className="w-3 h-3" />
-          <span>{language === 'en' ? 'EN' : 'PT-BR'}</span>
+          {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>
-        <div className="flex gap-2 items-center">
-          <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-          <span className="text-white/80">4 Machines Active</span>
+
+        <button 
+          onClick={toggleLanguage}
+          className="flex items-center gap-2 px-3 py-2 rounded-full text-studio-muted hover:text-studio-text hover:bg-studio-dots transition-all"
+        >
+          <Globe className="w-4 h-4" />
+          <span>{language === 'en' ? 'EN' : 'PT'}</span>
+        </button>
+        <div className="hidden sm:flex gap-2 items-center px-3 py-1.5 rounded-full bg-studio-dots">
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
+          <span className="text-studio-text text-xs">4 Active</span>
         </div>
-        <div className="h-4 w-[1px] bg-studio-border"></div>
-        <span className="opacity-50">14:28:45</span>
       </div>
     </header>
   );
