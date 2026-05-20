@@ -11,15 +11,20 @@ const __dirname = path.dirname(__filename);
 
 const PORT = 3000;
 
-// Deterministic AI Configuration
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+let _aiClient: GoogleGenAI | null = null;
+function getAIClient(): GoogleGenAI | null {
+  if (!_aiClient && process.env.GEMINI_API_KEY) {
+    _aiClient = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
-});
+  return _aiClient;
+}
 
 class BackendLogger {
   log(level: string, module: string, message: string, meta: Record<string, any> = {}) {
@@ -125,8 +130,24 @@ if (!isMainThread) {
       res.setHeader('Connection', 'keep-alive');
 
       try {
+        const ai = getAIClient();
+        if (!ai) {
+          // Simulate AI response when outside AI Studio (no API key)
+          logger.info("AI_COMPUTE", "No API key found. Falling back to simulated AI response.");
+          const simulatedResponse = "Simulated response: The AI compute engine is currently simulating this response because the native AI integration is only available inside the AI Studio environment. The operation requested was: " + message;
+          const words = simulatedResponse.split(" ");
+          
+          for (let i = 0; i < words.length; i++) {
+             res.write(`data: ${JSON.stringify({ text: words[i] + " " })}\n\n`);
+             await new Promise(r => setTimeout(r, 50));
+          }
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+
         const chat = ai.chats.create({
-          model: "gemini-3-flash-latest",
+          model: "gemini-3.5-flash",
           config: {
             systemInstruction: "You are the PaperFabrik AI Compute. You assist users with CAD, 3D printing, and photogrammetry. Provide precise, technical, and actionable responses. Use JSON if data structure is requested.",
             temperature: 0.2,
@@ -134,7 +155,7 @@ if (!isMainThread) {
         });
 
         // Seed history if provided
-        // Note: SDK handle internal state, but for stateless API we might want manual concatenation
+        // Note: SDK handle internal state, but for stateless API we might want manual concatenation // (Left as is)
         const stream = await chat.sendMessageStream({ message });
 
         for await (const chunk of stream) {
@@ -185,20 +206,42 @@ if (!isMainThread) {
         const { partId, length, material } = req.body;
         logger.info("CNC_MODULE", "Generating CNC G-Code paths", { partId, length, material });
         
+        let fRate = 1000;
+        let maxZ = 2;
         const partWidth = 50;
-        const feedRates: Record<string, number> = { 'pine': 1500, 'oak': 800, 'walnut': 1000, 'maple': 900, 'steel': 150 };
-        const zSteps: Record<string, number> = { 'pine': 5, 'oak': 3, 'walnut': 3, 'maple': 3, 'steel': 0.5 };
-        
-        const fRate = feedRates[(material || "").toLowerCase()] || 1000;
-        const maxZ = zSteps[(material || "").toLowerCase()] || 2;
         const partThickness = 50; 
-        
-        const passes = Math.ceil(partThickness / maxZ);
-        const actualZStep = partThickness / passes;
         const safeLength = typeof length === "number" ? length : 100;
         
+        const ai = getAIClient();
+        if (ai) {
+          try {
+             const chat = ai.chats.create({
+               model: "gemini-3.5-flash",
+               config: {
+                 systemInstruction: "You are an expert CNC machinist. Given a material type, return a JSON response with 'feedRate' (mm/min, integer) and 'maxZStep' (mm, float). Choose realistic values for a standard router.",
+                 responseMimeType: "application/json",
+                 temperature: 0.1
+               }
+             });
+             const aiResponse = await chat.sendMessage({ message: `Material: ${material || "unknown wood"}` });
+             const aiData = JSON.parse(aiResponse.text);
+             fRate = aiData.feedRate || 1000;
+             maxZ = aiData.maxZStep || 2;
+             logger.info("CNC_MODULE", "AI dynamically computed machining parameters", { material, fRate, maxZ });
+          } catch (aiErr) {
+             logger.warn("CNC_MODULE", "AI computation failed, falling back to static", { error: String(aiErr) });
+          }
+        } else {
+          const feedRates: Record<string, number> = { 'pine': 1500, 'oak': 800, 'walnut': 1000, 'maple': 900, 'steel': 150 };
+          const zSteps: Record<string, number> = { 'pine': 5, 'oak': 3, 'walnut': 3, 'maple': 3, 'steel': 0.5 };
+          fRate = feedRates[(material || "").toLowerCase()] || 1000;
+          maxZ = zSteps[(material || "").toLowerCase()] || 2;
+        }
+
+        const passes = Math.ceil(partThickness / maxZ);
+        const actualZStep = partThickness / passes;
+        
         let gcode = `G21 ; mm\nG90 ; absolute\nM3 S18000 ; Spindle ON\n`;
-        const uiPaths = [];
         let currentZ = 0;
         
         for (let pass = 1; pass <= passes; pass++) {
@@ -235,11 +278,55 @@ if (!isMainThread) {
       }
     });
 
+    app.post("/api/cad/bom", async (req, res) => {
+      try {
+        const ai = getAIClient();
+        if (ai) {
+           const chat = ai.chats.create({
+             model: "gemini-3.5-flash",
+             config: {
+               systemInstruction: "You are an electronics engineering assistant. Output JSON with a generic circuit BOM containing exactly these keys: 'U1', 'R1', 'C1', 'L1', 'OSC1'. For each key, provide 'name', an array of 'desc' strings, and a 'specs' object of key-value technical parameters.",
+               responseMimeType: "application/json",
+               temperature: 0.2
+             }
+           });
+           const aiResponse = await chat.sendMessage({ message: "Generate the BOM data payload in JSON format." });
+           const jsonText = aiResponse.text;
+           const bomData = JSON.parse(jsonText);
+           logger.info("CAD_BOM", "Successfully resolved BOM definitions via AI computation.");
+           res.json({ status: "success", data: bomData });
+           return;
+        }
+
+        const bomData = {
+          'U1': { name: 'STM32F411CEU6', desc: ['ARM Cortex-M4 32b MCU+FPU', '100 MHz max, 512 KB Flash, 128 KB SRAM', 'Package: UFQFPN48'], specs: { 'VDD': '1.7V - 3.6V', 'I/O': '36', 'ADC': '1x12-bit', 'Timers': '8' } },
+          'R1': { name: '10kΩ Resistor', desc: ['Thick Film Resistor', 'Tolerance: ±1%', 'Power: 0.063W', 'Package: 0402'], specs: { 'Value': '10kΩ', 'Tol': '1%', 'Temp': '±100ppm/°C', 'Rating': '1/16W' } },
+          'C1': { name: '100nF Capacitor', desc: ['Multilayer Ceramic Capacitor (MLCC)', 'Dielectric: X7R', 'Voltage: 16V', 'Package: 0402'], specs: { 'Cap': '100nF', 'Vol': '16V', 'Range': '-55°C to 125°C', 'Tol': '±10%' } },
+          'L1': { name: 'Blue LED', desc: ['SMD LED Blue 470nm', 'Lens: clear', 'Luminous: 150mcd', 'Package: 0603'], specs: { 'Vf': '3.1V', 'If': '20mA', 'Color': 'Blue', 'Angle': '120°' } },
+          'OSC1': { name: '16MHz Crystal', desc: ['Quartz Crystal', 'Load Cap: 10pF', 'Tolerance: ±20ppm', 'Package: 3.2x2.5mm'], specs: { 'Freq': '16MHz', 'CL': '10pF', 'ESR': '60Ω', 'Drive': '100µW' } }
+        };
+        logger.info("CAD_BOM", "Resolved fallback/static BOM definitions.");
+        res.json({ status: "success", data: bomData });
+      } catch (error: any) {
+        logger.error("CAD_BOM", "Failed to resolve BOM definitions", { error: error.message });
+        res.status(500).json({ status: "error", message: error.message });
+      }
+    });
+
     app.post("/api/cad/export", async (req, res) => {
       try {
-        const { format, projectData } = req.body;
-        logger.info("CAD_EXPORT", `Processing ${format} export job`, { projectData });
+        const { format, layer } = req.body;
+        logger.info("CAD_EXPORT", `Processing ${format} export job`, { layer });
         
+        if (format === "GBR") {
+          const header = Buffer.from(`%TF.GenerationSoftware,PaperFabrik*%\n%FSLAX26Y26*%\n%MOIN*%\n%ADD10C,0.010000*%\nD10*\nX000000Y000000D02*\nX010000Y010000D01*\nM02*\n`);
+          
+          res.setHeader("Content-Type", "application/vnd.gerber");
+          res.setHeader("Content-Disposition", `attachment; filename=design_${layer}_${Date.now()}.gbr`);
+          res.send(header);
+          return;
+        }
+
         if (format === "STL") {
           const header = Buffer.alloc(80);
           header.write("PaperFabrik_Export_STL_" + new Date().toISOString());
