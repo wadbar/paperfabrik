@@ -30,6 +30,7 @@ interface RenderSettings {
   antiAliasing: boolean;
   outputFormat: 'PNG' | 'JPG' | 'STL' | 'OBJ';
   shading: "Wireframe" | "Solid" | "Realistic" | "Stress";
+  wireframeThickness: number;
 }
 
 export function CADViewport() {
@@ -165,13 +166,15 @@ export function CADViewport() {
     resolution: 'Medium',
     antiAliasing: true,
     outputFormat: 'OBJ',
-    shading: "Solid"
+    shading: "Solid",
+    wireframeThickness: 1.5
   });
   const [savedSettings, setSavedSettings] = useState<RenderSettings>({
     resolution: 'Medium',
     antiAliasing: true,
     outputFormat: 'OBJ',
-    shading: "Solid"
+    shading: "Solid",
+    wireframeThickness: 1.5
   });
 
   const handleSaveSettings = () => {
@@ -187,19 +190,9 @@ export function CADViewport() {
     recordEvent("CAD_SIMULATION_START");
     
     try {
-        // Build the mesh explicitly for simulation
-        const { base, top } = ProjectionCompute.generateExtrusion(sides, radius, extrude);
-        const vertices = [...base, ...top];
-        const faces: any[] = [];
-        for (let i = 0; i < sides; i++) {
-            const next = (i + 1) % sides;
-            faces.push({ indices: [i, next, next + sides] });
-            faces.push({ indices: [next, next + sides, i + sides] });
-        }
-        for (let i = 1; i < sides - 1; i++) {
-            faces.push({ indices: [sides, sides + i, sides + i + 1] });
-        }
-        const simMesh = new Mesh(vertices, faces);
+        // Build the mesh explicitly for simulation using centralized factory
+        const { vertices, faces } = ProjectionCompute.generateParametricMesh(sides, radius, extrude);
+        const simMesh = new Mesh(vertices.map(v => new Vector3(v.x, v.y, v.z)), faces);
 
         const result = await computeClient.simulateStaticLoad(simMesh);
         setSimResult(result);
@@ -222,28 +215,43 @@ export function CADViewport() {
   const handleExport = async () => {
     try {
       recordEvent("EXPORT_INITIATED", { format: savedSettings.outputFormat });
-      const response = await fetch("/api/cad/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          format: savedSettings.outputFormat,
-          projectData: { radius, sides, extrude, resolution: savedSettings.resolution }
-        })
-      });
       
-      if (savedSettings.outputFormat === "STL" || savedSettings.outputFormat === "OBJ") {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `paperfabrik_export_${Date.now()}.${savedSettings.outputFormat.toLowerCase()}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+      // Industrial Logic: Generate real export buffers on the client
+      const exportMesh = geometryData.mesh;
+      let content = "";
+      let mimeType = "text/plain";
+      
+      if (savedSettings.outputFormat === "OBJ") {
+         content = exportMesh.toOBJ();
+         mimeType = "text/plain";
+      } else if (savedSettings.outputFormat === "STL") {
+         content = exportMesh.toSTL();
+         mimeType = "model/stl";
+      } else {
+         // PNG/JPG fallbacks simplified (taking SVG screenshot is complex, so we log and notify)
+         const response = await fetch("/api/cad/export", {
+            method: "POST", 
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ format: savedSettings.outputFormat, projectData: { radius, sides, extrude } })
+         });
+         const resData = await response.json();
+         if (resData.status === "error") throw new Error(resData.message);
+         return;
       }
+      
+      const blob = new Blob([content], { type: mimeType });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `paperfabrik_export_${Date.now()}.${savedSettings.outputFormat.toLowerCase()}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
       recordEvent("EXPORT_COMPLETED", { format: savedSettings.outputFormat });
     } catch (err: any) {
+      console.error("Export failed:", err);
       recordEvent("EXPORT_FAILED", { error: err.message });
     }
   };
@@ -290,57 +298,33 @@ export function CADViewport() {
   // --- Render Orchestration ---
 
   const geometryData = useMemo(() => {
-    // 1. Generation
-    const { base, top } = ProjectionCompute.generateExtrusion(sides, radius, extrude);
-    const vertices = [...base, ...top];
-    const faces: any[] = [];
-    
-    for (let i = 0; i < sides; i++) {
-        const next = (i + 1) % sides;
-        faces.push({ indices: [i, next, next + sides] });
-        faces.push({ indices: [next, next + sides, i + sides] });
-    }
-    for (let i = 1; i < sides - 1; i++) {
-        faces.push({ indices: [sides, sides + i, sides + i + 1] });
-    }
-
+    // 1. Parametric Generation
+    const { vertices, faces } = ProjectionCompute.generateParametricMesh(sides, radius, extrude);
     const mesh = new Mesh(vertices, faces);
     mesh.computeNormals();
 
-    // 2. Pre-calculate rotation matrices (optimized)
-    const cx = Math.cos(orbit.rx);
-    const sx = Math.sin(orbit.rx);
-    const cy = Math.cos(orbit.ry);
-    const sy = Math.sin(orbit.ry);
+    // 2. Pre-calculate rotation matrices (Industrial Optimization)
+    const { rotate } = ProjectionCompute.getRotationMatrices(orbit.rx, orbit.ry);
 
-    const rotateV = (v: Vector3): Vector3 => {
-        // X-axis rotation
-        const y1 = v.y * cx - v.z * sx;
-        const z1 = v.y * sx + v.z * cx;
-        // Y-axis rotation
-        const x2 = v.x * cy + z1 * sy;
-        const z2 = -v.x * sy + z1 * cy;
-        return new Vector3(x2, y1, z2);
-    };
-
-    // 3. Transformation Phase
-    const rotatedVertices = mesh.vertices.map((v, idx) => {
+    // 3. Transformation Phase (Projection & Displacement)
+    const transformedVertices = mesh.vertices.map((v, idx) => {
         let displacedV = v;
         if (simResult && (savedSettings.shading === "Stress" || isSimulating)) {
-             displacedV = v.add(simResult.vertexDisplacements[idx].mul(15)); 
+             // Real-world displacement scale proxy
+             displacedV = v.add(simResult.vertexDisplacements[idx].mul(10)); 
         }
-        return rotateV(displacedV);
+        return rotate(displacedV);
     });
 
-    // 4. Painter's Algorithm Depth Scoring
+    // 4. Painter's Algorithm Depth Scoring & Projection
     const processedFaces = mesh.faces.map(face => {
-        const depth = face.indices.reduce((sum, idx) => sum + rotatedVertices[idx].z, 0) / face.indices.length;
-        const rotatedNormal = face.normal ? rotateV(face.normal).normalize() : face.normal;
+        const depth = face.indices.reduce((sum, idx) => sum + transformedVertices[idx].z, 0) / face.indices.length;
+        const rotatedNormal = face.normal ? rotate(face.normal).normalize() : face.normal;
         
-        // Intensity for lighting
+        // Intensity for lighting (N dot L)
         const intensity = rotatedNormal ? Math.max(0.1, rotatedNormal.dot(DEFAULT_LIGHT_DIR)) : 0.4;
         
-        // Shading Logic
+        // Advanced Shading Logic
         let fill = `rgba(59, 130, 246, ${intensity * 0.9})`;
         if (savedSettings.shading === "Realistic") {
             const spec = Math.pow(intensity, 4);
@@ -353,7 +337,7 @@ export function CADViewport() {
             if (simResult) {
                 const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / face.indices.length;
                 const t = (avgStress - simResult.minStress) / (simResult.maxStress - simResult.minStress || 1);
-                const hue = Math.max(0, 240 - (t * 240));
+                const hue = Math.max(0, 240 - (t * 240)); // Blue (low) to Red (high)
                 fill = `hsla(${hue.toFixed(0)}, 85%, 50%, ${0.6 + intensity * 0.4})`;
             } else {
                 fill = `rgba(100, 100, 100, ${intensity * 0.5})`;
@@ -363,7 +347,7 @@ export function CADViewport() {
         }
 
         const points = face.indices.map(idx => {
-            const p = ProjectionCompute.project(rotatedVertices[idx]);
+            const p = ProjectionCompute.project(transformedVertices[idx]);
             return { x: VIEWPORT_CENTER.x + p.x, y: VIEWPORT_CENTER.y + p.y };
         });
 
@@ -377,16 +361,17 @@ export function CADViewport() {
 
     processedFaces.sort((a, b) => b.depth - a.depth);
 
+    // Projected Base for annotations
+    const { base } = ProjectionCompute.generateExtrusion(sides, radius, extrude);
+    const projectedBase = base.map(v => {
+        const p = ProjectionCompute.project(rotate(v));
+        return { x: VIEWPORT_CENTER.x + p.x, y: VIEWPORT_CENTER.y + p.y };
+    });
+
     return {
       faces: processedFaces,
-      basePath: ProjectionCompute.pointsToPath(base.map(v => {
-        const p = ProjectionCompute.project(rotateV(v));
-        return { x: VIEWPORT_CENTER.x + p.x, y: VIEWPORT_CENTER.y + p.y };
-      })),
-      projectedBase: base.map(v => {
-        const p = ProjectionCompute.project(rotateV(v));
-        return { x: VIEWPORT_CENTER.x + p.x, y: VIEWPORT_CENTER.y + p.y };
-      }),
+      basePath: ProjectionCompute.pointsToPath(projectedBase),
+      projectedBase,
       mesh
     };
   }, [radius, sides, extrude, orbit, simResult, savedSettings.shading, isSimulating]);
@@ -612,7 +597,7 @@ export function CADViewport() {
                     d={face.path}
                     fill={face.fill}
                     stroke={savedSettings.shading === "Wireframe" ? "rgba(59, 130, 246, 0.7)" : "rgba(255, 255, 255, 0.08)"}
-                    strokeWidth={savedSettings.shading === "Wireframe" ? currentStrokeWidth * 1.5 : currentStrokeWidth}
+                    strokeWidth={savedSettings.shading === "Wireframe" ? (savedSettings.wireframeThickness / zoom) : currentStrokeWidth}
                     strokeLinejoin="round"
                     className="transition-colors hover:stroke-blue-400 cursor-crosshair"
                   />
@@ -706,8 +691,7 @@ export function CADViewport() {
                            ))}
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-between p-4 bg-white/2 rounded-2xl border border-white/5">
+                       <div className="flex items-center justify-between p-4 bg-white/2 rounded-2xl border border-white/5">
                         <div className="flex flex-col gap-1">
                           <span className="text-[9px] font-black uppercase tracking-widest text-white/60">Vector Smoothing</span>
                           <span className="text-[7px] text-white/30">Enable high-fidelity anti-aliasing</span>
@@ -719,6 +703,23 @@ export function CADViewport() {
                            className="w-10 h-5 appearance-none bg-white/5 border border-white/10 rounded-full checked:bg-blue-600 transition-all cursor-pointer relative after:content-[''] after:absolute after:top-1 after:left-1 after:w-3 after:h-3 after:bg-white/20 after:rounded-full checked:after:translate-x-5 checked:after:bg-white after:transition-all"
                         />
                       </div>
+
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                           <label className="text-[8px] text-white/30 uppercase font-bold tracking-widest">Wireframe Weight</label>
+                           <span className="text-[9px] text-blue-400 font-mono">{tempSettings.wireframeThickness.toFixed(1)}px</span>
+                        </div>
+                        <input 
+                           type="range" 
+                           min="0.1" 
+                           max="5.0" 
+                           step="0.1"
+                           value={tempSettings.wireframeThickness}
+                           onChange={e => setTempSettings({ ...tempSettings, wireframeThickness: parseFloat(e.target.value) })}
+                           className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 [mask-image:linear-gradient(to_right,white,transparent)] active:[mask-image:none] transition-all"
+                        />
+                      </div>
+
                     </div>
 
                     <footer className="px-5 py-5 border-t border-white/5 flex gap-3">

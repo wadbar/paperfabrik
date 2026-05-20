@@ -107,4 +107,24 @@ export class Mesh {
     });
     return obj;
   }
+
+  /**
+   * Export to Standard Tessellation Language (STL) Ascii format
+   */
+  toSTL(): string {
+    let stl = "solid PaperFabrik_Export\n";
+    this.faces.forEach(f => {
+      const normal = f.normal || Vector3.zero();
+      stl += `  facet normal ${normal.x.toFixed(6)} ${normal.y.toFixed(6)} ${normal.z.toFixed(6)}\n`;
+      stl += "    outer loop\n";
+      f.indices.forEach(idx => {
+        const v = this.vertices[idx];
+        stl += `      vertex ${v.x.toFixed(6)} ${v.y.toFixed(6)} ${v.z.toFixed(6)}\n`;
+      });
+      stl += "    endloop\n";
+      stl += "  endfacet\n";
+    });
+    stl += "endsolid PaperFabrik_Export\n";
+    return stl;
+  }
 }

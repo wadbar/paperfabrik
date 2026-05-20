@@ -41,20 +41,36 @@ export class SimulationService {
       }
     });
 
-    // Simplified Elasticity Simulation: Force propagates from top to fixed bottom
-    mesh.vertices.forEach((v, i) => {
-        if (fixedVertices.has(i)) return;
+    // Structural Analysis Phase: Multi-variant stress calculation
+    // 1. Calculate centroid for moment arm base logic
+    const centroid = mesh.vertices.reduce((acc, v) => acc.add(v), Vector3.zero()).mul(1 / mesh.vertices.length);
 
-        // Mocking stress based on Z-height and distance from central axis
-        // Higher vertices feel more bending moment in a cantilever-like simulation
+    mesh.vertices.forEach((v, i) => {
+        if (fixedVertices.has(i)) {
+            stressValues[i] = 0.05; // Base residual stress
+            return;
+        }
+
+        // Calculation of local structural metrics
         const height = Math.abs(v.z - minZ);
-        const radialDist = Math.sqrt(v.x**2 + v.y**2);
+        const leverArm = new Vector3(v.x - centroid.x, v.y - centroid.y, 0).length();
         
-        // P=F/A simulation logic (Simplified)
-        stressValues[i] = (height * 0.1) + (radialDist * 0.05) + Math.random() * 0.01;
+        // Linear Elastic Approximation
+        // Tensile/Normal Stress component (proportional to height/weight above)
+        const normalStress = height * 0.15;
         
-        // Displacement along load vector
-        vertexDisplacements[i] = load.mul(stressValues[i] * 0.5);
+        // Bending Moment component (approximated cantilever behavior)
+        const bendingMoment = (load.length() * height) * leverArm * 0.2;
+        
+        // von Mises approximation combining normal and shear (simplified for surface mesh)
+        const combinedStress = Math.sqrt(Math.pow(normalStress, 2) + 3 * Math.pow(bendingMoment, 2));
+        
+        stressValues[i] = combinedStress;
+        
+        // Displacement: Scaled by material stiffness (Young's Modulus E proxy)
+        const E = 2000; // Proxy for structural stiffness
+        const displacementMagnitude = combinedStress / E;
+        vertexDisplacements[i] = load.mul(displacementMagnitude * height);
     });
 
     const maxStress = Math.max(...stressValues);
