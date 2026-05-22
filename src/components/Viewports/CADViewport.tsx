@@ -48,6 +48,7 @@ export function CADViewport() {
   const [orbit, setOrbit] = useState({ rx: 0.2, ry: 0.5 }); // Initial orbit for better 3D feel
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
+  const [showWireframeOverlay, setShowWireframeOverlay] = useState(true);
   const [gridSize, setGridSize] = useState(25);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
@@ -176,6 +177,7 @@ export function CADViewport() {
     shading: "Solid",
     wireframeThickness: 1.5
   });
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   const handleSaveSettings = () => {
     setSavedSettings(tempSettings);
@@ -451,14 +453,23 @@ export function CADViewport() {
            )}
            
            {/* Navigation HUD */}
-           <div className="absolute bottom-6 left-6 pointer-events-none flex flex-col gap-2 z-10 scale-90 origin-bottom-left">
+           <motion.div
+             layout
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             exit={{ opacity: 0, y: 20 }}
+             className="absolute bottom-6 left-6 pointer-events-none flex flex-col gap-2 z-10 scale-90 origin-bottom-left"
+           >
               <motion.div 
                 layout
-                className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-3 px-4 flex flex-col gap-2 shadow-2xl ring-1 ring-white/5"
+                className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-3 px-4 flex flex-col gap-2 shadow-2xl ring-1 ring-white/5 pointer-events-auto"
               >
                 <header className="flex items-center justify-between gap-8">
                   <span className="text-[9px] text-white/30 uppercase font-black tracking-[0.2em] leading-none">Status_HUD_0.4</span>
-                  <div className={`w-2 h-2 rounded-full ring-4 ${isDragging ? 'bg-blue-500 ring-blue-500/20 animate-pulse' : 'bg-white/10 ring-transparent'}`} />
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full transition-colors ${showWireframeOverlay ? 'bg-emerald-500' : 'bg-white/20'}`} title="Wireframe Status" />
+                    <div className={`w-2 h-2 rounded-full ring-4 ${isDragging ? 'bg-blue-500 ring-blue-500/20 animate-pulse' : 'bg-white/10 ring-transparent'}`} />
+                  </div>
                 </header>
 
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2">
@@ -495,6 +506,26 @@ export function CADViewport() {
                   <HUDItem icon={Layers} value={savedSettings.shading} label="Mode" highlight />
                 </div>
 
+                <AnimatePresence initial={false}>
+                  {showWireframeOverlay && (
+                    <motion.div
+                      layout
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-2 pt-2 border-t border-white/5 space-y-1.5 flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                            <Box className="w-3 h-3 text-blue-400" />
+                            <span className="text-[7px] text-white/50 tracking-[0.1em] font-black uppercase">WIREFRAME_ACTIVE</span>
+                         </div>
+                         <span className="text-[9px] text-blue-400 font-mono">{savedSettings.wireframeThickness}px</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {savedSettings.shading === "Stress" && simResult && (
                    <div className="mt-2 pt-2 border-t border-white/5 space-y-1.5">
                       <div className="flex justify-between items-center text-[7px] text-white/30 uppercase tracking-[0.1em] font-black">
@@ -519,7 +550,7 @@ export function CADViewport() {
                    <span className="text-[6px] text-white/40 uppercase tracking-widest">Grid: {gridSize}mm</span>
                 </footer>
               </motion.div>
-           </div>
+           </motion.div>
 
            {/* Orientation Gizmo */}
            <div className="absolute bottom-6 right-6 w-20 h-20 pointer-events-none opacity-40 select-none">
@@ -596,8 +627,8 @@ export function CADViewport() {
                     key={i}
                     d={face.path}
                     fill={face.fill}
-                    stroke={savedSettings.shading === "Wireframe" ? "rgba(59, 130, 246, 0.7)" : "rgba(255, 255, 255, 0.08)"}
-                    strokeWidth={savedSettings.shading === "Wireframe" ? (savedSettings.wireframeThickness / zoom) : currentStrokeWidth}
+                    stroke={savedSettings.shading === "Wireframe" ? "rgba(59, 130, 246, 0.7)" : (showWireframeOverlay ? "rgba(255, 255, 255, 0.08)" : "transparent")}
+                    strokeWidth={savedSettings.shading === "Wireframe" ? (savedSettings.wireframeThickness / zoom) : (showWireframeOverlay ? currentStrokeWidth : 0)}
                     strokeLinejoin="round"
                     className="transition-colors hover:stroke-blue-400 cursor-crosshair"
                   />
@@ -616,6 +647,9 @@ export function CADViewport() {
 
            {/* Viewport Top Actions */}
            <div className="absolute top-4 right-4 flex gap-1 z-10">
+              <ActionButton onClick={() => setShowWireframeOverlay(!showWireframeOverlay)} active={showWireframeOverlay} title="Toggle Wireframe">
+                 <Box className="w-3 h-3" />
+              </ActionButton>
               <ActionButton onClick={undo} disabled={historyIndex === 0} title="Undo">
                  <Undo2 className="w-3 h-3" />
               </ActionButton>
@@ -629,7 +663,7 @@ export function CADViewport() {
               <ActionButton onClick={handleOpenSettings} active={isSettingsOpen} title="Config">
                  <Settings2 className="w-3 h-3" />
               </ActionButton>
-              <ActionButton onClick={handleExport} variant="danger" title={t("cad.export")}>
+              <ActionButton onClick={() => setIsPreviewModalOpen(true)} variant="danger" title={t("cad.export")}>
                  <Download className="w-3 h-3" />
               </ActionButton>
            </div>
@@ -730,14 +764,106 @@ export function CADViewport() {
                 </motion.div>
               )}
            </AnimatePresence>
+
+           {/* Preview Modal */}
+           <AnimatePresence>
+              {isPreviewModalOpen && (
+                <motion.div 
+                  initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                  animate={{ opacity: 1, backdropFilter: 'blur(4px)' }}
+                  exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-6"
+                  onClick={() => setIsPreviewModalOpen(false)}
+                >
+                  <motion.div 
+                    initial={{ scale: 0.95, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.95, y: 20 }}
+                    className="w-full max-w-lg bg-studio-panel border border-studio-border rounded-2xl shadow-3xl overflow-hidden flex flex-col md-elevation-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <header className="px-6 py-4 border-b border-studio-border flex justify-between items-center bg-studio-bg/50">
+                       <div className="flex items-center gap-3">
+                         <div className="p-2 bg-studio-accent/10 rounded-xl text-studio-accent">
+                           <Layers className="w-5 h-5" />
+                         </div>
+                         <div>
+                           <h3 className="text-sm font-bold text-studio-text">Export Preview</h3>
+                           <p className="text-xs text-studio-muted">Verify orientation and scale before export</p>
+                         </div>
+                       </div>
+                       <button onClick={() => setIsPreviewModalOpen(false)} className="p-2 hover:bg-studio-dots rounded-full text-studio-muted hover:text-studio-text transition-colors"><X className="w-5 h-5" /></button>
+                    </header>
+
+                    <div className="p-6 flex flex-col gap-4">
+                       <div className="w-full aspect-video bg-studio-bg rounded-xl border border-studio-border/50 overflow-hidden relative flex items-center justify-center">
+                          <svg 
+                            className="w-full h-full text-studio-accent drop-shadow-lg"
+                            viewBox="0 0 200 200"
+                            shapeRendering="geometricPrecision"
+                          >
+                             <g transform="scale(0.8) translate(25, 25)">
+                               {geometryData.faces.map((face, i) => (
+                                 <path 
+                                   key={i}
+                                   d={face.path}
+                                   fill="none"
+                                   stroke="currentColor"
+                                   strokeWidth={0.5}
+                                   strokeLinejoin="round"
+                                   className="opacity-70"
+                                 />
+                               ))}
+                             </g>
+                          </svg>
+                          <div className="absolute bottom-4 left-4 flex gap-2">
+                             <div className="px-3 py-1.5 bg-studio-panel/80 backdrop-blur border border-studio-border/50 text-xs text-studio-text rounded-lg tracking-wider font-bold shadow-lg">
+                                FORMAT: <span className="text-studio-accent">{savedSettings.outputFormat}</span>
+                             </div>
+                          </div>
+                          
+                          <div className="absolute top-4 right-4 flex gap-2">
+                             <div className="px-2 py-1 bg-studio-panel/80 backdrop-blur border border-studio-border/50 text-[10px] text-emerald-500 rounded font-mono">
+                                {geometryData.mesh.vertices.length} VERTS
+                             </div>
+                          </div>
+                          
+                           {/* Orientation Gizmo inside modal */}
+                           <div className="absolute bottom-4 right-4 w-12 h-12 pointer-events-none opacity-60">
+                              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md">
+                                <g transform={`translate(50, 50) rotate(${orbit.ry * 57.3}) scale(${Math.max(0.2, Math.cos(orbit.rx))})`}>
+                                   <g>
+                                      <line x1="0" y1="0" x2="38" y2="0" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" />
+                                      <text x="46" y="4" fontSize="14" fill="#ef4444" fontWeight="bold" textAnchor="middle">X</text>
+                                   </g>
+                                   <g>
+                                      <line x1="0" y1="0" x2="0" y2="-38" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" />
+                                      <text x="0" y="-46" fontSize="14" fill="#22c55e" fontWeight="bold" textAnchor="middle">Y</text>
+                                   </g>
+                                </g>
+                              </svg>
+                           </div>
+                       </div>
+                    </div>
+
+                    <footer className="px-6 py-5 border-t border-studio-border flex gap-4 bg-studio-bg/30">
+                       <button onClick={() => setIsPreviewModalOpen(false)} className="flex-1 py-3 text-sm font-bold uppercase rounded-xl border border-studio-border hover:bg-studio-dots text-studio-text transition-colors">Cancel</button>
+                       <button onClick={() => { setIsPreviewModalOpen(false); handleExport(); }} className="flex-1 py-3 bg-studio-accent text-white text-sm font-bold uppercase rounded-xl md-elevation-1 hover:md-elevation-2 active:scale-95 transition-all flex justify-center items-center gap-2 shadow-[0_10px_20px_-5px_var(--color-studio-accent)]">
+                         <Download className="w-4 h-4" /> Finalize Export
+                       </button>
+                    </footer>
+                  </motion.div>
+                </motion.div>
+              )}
+           </AnimatePresence>
         </main>
 
         {/* Global Action Toolbar */}
-        <div className="w-12 bg-[#0d1117] border-l border-white/5 flex flex-col p-2.5 gap-3 shrink-0 items-center shadow-inner">
+        <div className="w-16 md:w-20 bg-studio-panel border-l border-studio-border/50 flex flex-col py-6 gap-6 shrink-0 items-center md-elevation-1 z-10">
           <ToolIcon icon={MousePointer2} active />
           <ToolIcon icon={Compass} />
           <ToolIcon icon={Ruler} />
-          <div className="w-full h-px bg-white/5 my-1" />
+          <div className="w-8 h-px bg-studio-border/50 my-2 rounded-full" />
           <ToolIcon icon={Layers} />
         </div>
       </div>
@@ -746,30 +872,29 @@ export function CADViewport() {
 }
 
 // --- Internal Components ---
-
 function TreeItem({ name, icon: Icon, active }: { name: string, icon: any, active?: boolean }) {
   return (
-    <div className={`group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${active ? 'bg-blue-500/10 text-blue-400 font-bold' : 'text-white/30 hover:text-white/60 hover:bg-white/2'}`}>
-      <Icon className={`w-3 h-3 ${active ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'}`} />
-      <span className="text-[9px] truncate tracking-tight">{name}</span>
+    <div className={`group flex items-center gap-3 p-3 flex-1 rounded-xl cursor-pointer transition-all ${active ? 'bg-studio-accent/10 text-studio-accent font-bold' : 'text-studio-muted hover:text-studio-text hover:bg-studio-dots'}`}>
+      <Icon className={`w-4 h-4 ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`} />
+      <span className="text-xs truncate tracking-wide">{name}</span>
     </div>
   );
 }
 
 function ToolIcon({ icon: Icon, active }: { icon: any, active?: boolean }) {
   return (
-    <button className={`p-2 rounded-xl transition-all duration-300 ${active ? 'bg-blue-600 text-white shadow-lg scale-110' : 'text-white/20 hover:text-white/70 hover:bg-white/5'}`}>
-      <Icon className="w-4 h-4 stroke-[1.5px]" />
+    <button className={`p-3 rounded-2xl transition-all duration-300 ${active ? 'bg-studio-accent text-white shadow-lg md-elevation-2 scale-110' : 'text-studio-muted hover:text-studio-text hover:bg-studio-dots'}`}>
+      <Icon className="w-5 h-5 stroke-[1.5px]" />
     </button>
   );
 }
 
 function ParametricInput({ label, value, onChange, onCommit, min = 1, max = 500 }: { label: string, value: number, onChange: (v: number) => void, onCommit: () => void, min?: number, max?: number }) {
   return (
-     <div className="flex flex-col gap-1 text-[8px] text-white/40 uppercase font-black tracking-widest mb-2">
-        <div className="flex justify-between items-center px-0.5">
-           <span>{label}</span>
-           <span className="text-white/20 text-[7px]">{value}mm</span>
+     <div className="flex flex-col gap-1.5 text-xs text-studio-muted uppercase font-bold tracking-wider mb-4">
+        <div className="flex justify-between items-center px-1">
+           <span className="text-studio-text">{label}</span>
+           <span className="text-studio-muted text-[10px] bg-studio-dots px-2 py-0.5 rounded-full">{value}mm</span>
         </div>
         <input 
            type="number" 
@@ -777,7 +902,7 @@ function ParametricInput({ label, value, onChange, onCommit, min = 1, max = 500 
            onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value))))} 
            onBlur={() => onCommit()} 
            onKeyDown={e => e.key === 'Enter' && onCommit()} 
-           className="w-full bg-black/40 border border-white/5 hover:border-white/10 px-2 py-1.5 rounded-md text-right text-white/80 focus:outline-none focus:border-blue-500/50 transition-colors" 
+           className="w-full bg-studio-dots hover:bg-studio-border/20 border-b-2 border-transparent focus:border-studio-accent px-4 py-3 rounded-t-xl text-right text-studio-text focus:outline-none transition-colors font-mono font-bold" 
         />
      </div>
   );
@@ -785,11 +910,11 @@ function ParametricInput({ label, value, onChange, onCommit, min = 1, max = 500 
 
 function HUDItem({ icon: Icon, value, label, highlight }: { icon: any, value: string, label: string, highlight?: boolean }) {
    return (
-      <div className="flex flex-col gap-0.5 min-w-[50px]">
-         <span className="text-[6px] text-white/20 uppercase font-black tracking-[0.1em]">{label}</span>
-         <div className="flex items-center gap-1.5">
-            <Icon className={`w-2.5 h-2.5 ${highlight ? 'text-blue-400' : 'text-white/40'}`} />
-            <span className={`text-[9px] font-mono select-none ${highlight ? 'text-blue-400/90 font-black' : 'text-white/60'}`}>{value}</span>
+      <div className="flex flex-col gap-1 min-w-[60px]">
+         <span className="text-[9px] text-studio-muted uppercase font-bold tracking-widest">{label}</span>
+         <div className="flex items-center gap-2">
+            <Icon className={`w-3.5 h-3.5 ${highlight ? 'text-studio-accent' : 'text-studio-muted'}`} />
+            <span className={`text-xs font-mono select-none ${highlight ? 'text-studio-accent font-black' : 'text-studio-text font-medium'}`}>{value}</span>
          </div>
       </div>
    );
@@ -797,25 +922,25 @@ function HUDItem({ icon: Icon, value, label, highlight }: { icon: any, value: st
 
 function ToolCluster({ active, onSelect, onResetPan }: { active: string, onSelect: (v: any) => void, onResetPan: () => void }) {
    return (
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center bg-black/60 backdrop-blur-2xl border border-white/5 rounded-full p-1.5 shadow-3xl z-10 gap-2 ring-1 ring-white/5">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center bg-studio-panel/90 backdrop-blur-xl border border-studio-border/50 rounded-full p-2 md-elevation-2 z-10 gap-2">
         <NavButton active={active === 'orbit'} onClick={() => onSelect('orbit')} title="Orbit Mode">
-           <Orbit className="w-4 h-4" />
+           <Orbit className="w-5 h-5" />
         </NavButton>
         <div className="relative group/pan">
            <NavButton active={active === 'pan'} onClick={() => onSelect('pan')} onDoubleClick={onResetPan} title="Pan View (dbl-click to center)">
-              <Hand className="w-4 h-4" />
+              <Hand className="w-5 h-5" />
            </NavButton>
            {active === 'pan' && (
               <button 
                 onClick={onResetPan} 
-                className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center text-white border-2 border-[#09090b] hover:scale-125 transition-transform"
+                className="absolute -top-1 -right-1 w-5 h-5 bg-studio-accent rounded-full flex items-center justify-center text-white border-2 border-studio-panel hover:scale-125 transition-transform shadow-sm"
               >
-                <X className="w-2 h-2 stroke-[3px]" />
+                <X className="w-3 h-3 stroke-[3px]" />
               </button>
            )}
         </div>
         <NavButton active={active === 'zoom'} onClick={() => onSelect('zoom')} title="Zoom Adjustment">
-           <ZoomIn className="w-4 h-4" />
+           <ZoomIn className="w-5 h-5" />
         </NavButton>
       </div>
    );
@@ -826,7 +951,7 @@ function NavButton({ children, active, onClick, onDoubleClick, title }: { childr
       <button
         onClick={onClick}
         onDoubleClick={onDoubleClick}
-        className={`p-2 rounded-full transition-all duration-300 ${active ? 'bg-blue-600 text-white shadow-lg ring-4 ring-blue-500/20 scale-110' : 'text-white/30 hover:text-white/80 hover:bg-white/5'}`}
+        className={`p-3 rounded-full transition-all duration-300 ${active ? 'bg-studio-accent text-white shadow-md md-elevation-1 scale-110' : 'text-studio-muted hover:text-studio-text hover:bg-studio-dots'}`}
         title={title}
       >
         {children}
@@ -839,7 +964,7 @@ function ActionButton({ children, onClick, disabled, active, variant, title }: {
       <button 
          onClick={onClick} 
          disabled={disabled}
-         className={`p-2 border rounded-xl transition-all ${disabled ? 'opacity-20 cursor-not-allowed' : active ? 'bg-blue-500/20 border-blue-500 text-blue-400' : variant === 'danger' ? 'bg-red-500/5 border-red-500/20 text-red-400 hover:bg-red-500/20 hover:border-red-500/50' : 'bg-black/40 border-white/10 text-white/40 hover:bg-white/5 hover:text-white hover:border-white/20 shadow-lg active:scale-95'}`}
+         className={`p-3 border rounded-full transition-all flex items-center justify-center shrink-0 ${disabled ? 'opacity-30 cursor-not-allowed' : active ? 'bg-studio-accent/20 border-studio-accent text-studio-accent font-bold md-elevation-1' : variant === 'danger' ? 'bg-red-500/10 border-red-500/30 text-red-600 hover:bg-red-500 hover:text-white dark:text-red-400 dark:hover:text-white hover:border-red-500 shadow-sm' : 'bg-studio-bg border-studio-border text-studio-muted hover:bg-studio-dots hover:text-studio-text shadow-sm active:scale-95'}`}
          title={title}
       >
          {children}
@@ -851,7 +976,7 @@ function ToggleButton({ children, active, onClick, title }: { children: React.Re
    return (
       <button 
          onClick={onClick} 
-         className={`p-2 border rounded-xl transition-all ${active ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-black/40 border-white/10 text-white/30 hover:bg-white/5'}`}
+         className={`p-3 border rounded-full transition-all flex items-center justify-center shrink-0 ${active ? 'bg-studio-accent border-studio-accent text-white md-elevation-1' : 'bg-studio-bg border-studio-border text-studio-muted hover:bg-studio-dots hover:text-studio-text'}`}
          title={title}
       >
          {children}

@@ -164,10 +164,10 @@ export function CircuitViewport() {
   const currentTheme = pcbTheme[activeLayer];
 
   return (
-    <div className="flex h-full flex-col font-mono text-[11px] selection:bg-emerald-500/30">
-      <div className="flex-1 bg-[#050505] rounded border border-white/5 relative p-4 flex gap-4 min-h-0 overflow-hidden">
+    <div className="flex h-full flex-col font-sans selection:bg-studio-accent/30">
+      <div className="flex-1 bg-studio-bg rounded-2xl border border-studio-border/50 relative p-6 flex gap-6 min-h-0 overflow-hidden">
         {/* Core Canvas Context */}
-        <div className={`flex-1 border-2 rounded-sm relative transition-colors ${currentTheme.bg} ${currentTheme.border} overflow-hidden`}>
+        <div className={`flex-1 border-2 rounded-2xl relative transition-colors ${currentTheme.bg} ${currentTheme.border} overflow-hidden md-elevation-1`}>
           {/* Hardware Grid Matrix */}
           <div className="absolute inset-0 opacity-[0.03] transition-colors" style={{ backgroundImage: `linear-gradient(${currentTheme.grid} 1px, transparent 1px), linear-gradient(90deg, ${currentTheme.grid} 1px, transparent 1px)`, backgroundSize: '10px 10px' }} />
           
@@ -270,12 +270,14 @@ export function CircuitViewport() {
           </svg>
 
           {/* Logic Probe Indicator (Realtime) */}
-          <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-              <div className="flex items-center gap-2 bg-black/80 border border-white/10 p-2 rounded backdrop-blur-sm shadow-xl">
-                 <Server className={`w-3 h-3 ${telemetry.connection === 'SYNCED' ? 'text-emerald-500 animate-pulse' : 'text-red-500'}`} />
-                 <div className="flex flex-col">
-                   <span className="text-[7px] text-emerald-500 uppercase font-black">{t("pcb.telemetry") || "NODE_LINK"}</span>
-                   <span className="text-[9px] text-white">UPTIME: {(telemetry.load || 0).toFixed(0)}h / LINK: {telemetry.connection}</span>
+          <div className="absolute top-6 left-6 flex flex-col gap-3 z-10">
+              <div className="flex items-center gap-4 bg-studio-panel/90 border border-studio-border p-3 rounded-2xl backdrop-blur-xl md-elevation-1">
+                 <div className={`p-2 rounded-xl ${telemetry.connection === 'SYNCED' ? 'bg-pack-accent/20 text-pack-accent' : 'bg-red-500/20 text-red-500'}`}>
+                   <Server className={`w-5 h-5 ${telemetry.connection === 'SYNCED' ? 'animate-pulse' : ''}`} />
+                 </div>
+                 <div className="flex flex-col pr-2">
+                   <span className="text-[10px] text-studio-muted uppercase font-bold tracking-widest">{t("pcb.telemetry") || "NODE_LINK"}</span>
+                   <span className="text-xs text-studio-text font-bold">UPTIME: {(telemetry.load || 0).toFixed(0)}h / LINK: {telemetry.connection}</span>
                  </div>
               </div>
               
@@ -283,52 +285,52 @@ export function CircuitViewport() {
                   {sysError && (
                       <motion.div 
                           initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
-                          className="flex items-start gap-2 bg-red-950/80 border border-red-500/50 p-2 rounded backdrop-blur-sm max-w-[200px]"
+                          className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 p-3 rounded-2xl backdrop-blur-xl max-w-[280px] md-elevation-1"
                       >
-                          <AlertCircle className="w-3 h-3 text-red-500 shrink-0 mt-0.5" />
-                          <span className="text-[7px] text-red-400 font-bold leading-tight">{sysError}</span>
+                          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                          <span className="text-xs text-red-600 dark:text-red-400 font-bold leading-tight">{sysError}</span>
                       </motion.div>
                   )}
               </AnimatePresence>
           </div>
 
           {/* Core Hardware Metrics Window (Telemetric Feed) */}
-          <div className="absolute bottom-4 right-4 bg-black/90 border border-white/10 p-3 rounded shadow-2xl backdrop-blur-lg w-40 z-10 transition-transform">
-             <div className="flex flex-col gap-2">
+          <div className="absolute bottom-6 right-6 bg-studio-panel/90 border border-studio-border p-5 rounded-2xl backdrop-blur-xl w-56 z-10 md-elevation-1 transition-transform">
+             <div className="flex flex-col gap-4">
                <div>
-                   <div className="flex justify-between items-center text-[7px] font-bold text-white/70 mb-1">
+                   <div className="flex justify-between items-center text-[10px] font-bold text-studio-muted mb-2 tracking-wider">
                      <span>CPU_DAEMON_LOAD</span>
-                     <span className="font-mono text-emerald-400">{telemetry.load.toFixed(1)}%</span>
+                     <span className="font-mono text-pack-accent">{telemetry.load.toFixed(1)}%</span>
                    </div>
-                   <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                     <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${telemetry.load}%` }} />
+                   <div className="h-1.5 bg-studio-border/50 rounded-full overflow-hidden">
+                     <div className="h-full bg-pack-accent transition-all duration-300 rounded-full" style={{ width: `${telemetry.load}%` }} />
                    </div>
                </div>
                
                <div>
-                   <div className="flex justify-between items-center text-[7px] font-bold text-white/70 mb-1">
+                   <div className="flex justify-between items-center text-[10px] font-bold text-studio-muted mb-2 tracking-wider">
                      <span>GPU_PIPELINE</span>
-                     <span className="font-mono text-purple-400">{telemetry.gpu.toFixed(1)}%</span>
+                     <span className="font-mono text-apparel-accent">{telemetry.gpu.toFixed(1)}%</span>
                    </div>
-                   <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                     <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${telemetry.gpu}%` }} />
+                   <div className="h-1.5 bg-studio-border/50 rounded-full overflow-hidden">
+                     <div className="h-full bg-apparel-accent transition-all duration-300 rounded-full" style={{ width: `${telemetry.gpu}%` }} />
                    </div>
                </div>
 
                <div>
-                   <div className="flex justify-between items-center text-[7px] font-bold text-white/70 mb-1">
+                   <div className="flex justify-between items-center text-[10px] font-bold text-studio-muted mb-2 tracking-wider">
                      <span>HEAP_ALLOCATION</span>
-                     <span className="font-mono text-blue-400">{telemetry.ram.toFixed(1)}%</span>
+                     <span className="font-mono text-studio-accent">{telemetry.ram.toFixed(1)}%</span>
                    </div>
-                   <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                     <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${telemetry.ram}%` }} />
+                   <div className="h-1.5 bg-studio-border/50 rounded-full overflow-hidden">
+                     <div className="h-full bg-studio-accent transition-all duration-300 rounded-full" style={{ width: `${telemetry.ram}%` }} />
                    </div>
                </div>
                
-               <div className="mt-1 pt-2 border-t border-white/10 flex justify-between items-center text-[7px]">
-                  <span className="text-white/40 uppercase font-black">NETWORK_SYNC</span>
-                  <span className={`flex items-center gap-1 font-black shadow-lg ${telemetry.connection === 'SYNCED' ? 'text-emerald-500' : 'text-red-500'}`}>
-                     {telemetry.connection === 'SYNCED' ? <Activity className="w-2.5 h-2.5 animate-pulse" /> : <Zap className="w-2.5 h-2.5" />}
+               <div className="mt-2 pt-3 border-t border-studio-border/50 flex justify-between items-center text-[10px] font-bold tracking-wider">
+                  <span className="text-studio-muted uppercase">NETWORK_SYNC</span>
+                  <span className={`flex items-center gap-1.5 ${telemetry.connection === 'SYNCED' ? 'text-pack-accent' : 'text-red-500'}`}>
+                     {telemetry.connection === 'SYNCED' ? <Activity className="w-3.5 h-3.5 animate-pulse" /> : <Zap className="w-3.5 h-3.5" />}
                      {telemetry.connection}
                   </span>
                </div>
@@ -349,27 +351,27 @@ export function CircuitViewport() {
                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    className="absolute top-20 left-4 bg-black/95 border border-emerald-500/30 p-4 rounded shadow-2xl backdrop-blur-xl w-56 z-20 origin-top-left"
+                    className="absolute top-28 left-6 bg-studio-panel/95 border border-studio-border p-5 rounded-2xl shadow-3xl backdrop-blur-xl w-72 z-20 origin-top-left md-elevation-2"
                 >
-                  <div className="flex justify-between items-start mb-3 border-b border-white/10 pb-2">
+                  <div className="flex justify-between items-start mb-4 border-b border-studio-border/50 pb-3">
                     <div className="flex flex-col">
-                        <span className="text-emerald-400 font-black text-[12px]">{bomData[selectedComponent].name}</span>
-                        <span className="text-white/40 font-bold text-[7px] uppercase tracking-wider">{selectedComponent} - VERIFIED_NODE</span>
+                        <span className="text-pack-accent font-black text-sm">{bomData[selectedComponent].name}</span>
+                        <span className="text-studio-muted font-bold text-[10px] uppercase tracking-wider">{selectedComponent} - NODE</span>
                     </div>
-                    <button onClick={() => setSelectedComponent(null)} className="text-white/40 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded w-5 h-5 flex items-center justify-center">&times;</button>
+                    <button onClick={() => setSelectedComponent(null)} className="text-studio-muted hover:text-studio-text transition-colors bg-studio-dots hover:bg-studio-border/50 rounded-full w-8 h-8 flex items-center justify-center font-xl">&times;</button>
                   </div>
-                  <div className="text-[8px] text-white/80 space-y-1 mb-3">
+                  <div className="text-xs text-studio-text space-y-2 mb-4">
                     {bomData[selectedComponent].desc.map((line: string, i: number) => (
-                       <p key={i} className="flex gap-1.5"><Zap className="w-2.5 h-2.5 text-zinc-600 shrink-0"/> {line}</p>
+                       <p key={i} className="flex gap-2"><Zap className="w-3.5 h-3.5 text-studio-muted shrink-0"/> {line}</p>
                     ))}
                   </div>
-                  <div className="bg-white/5 rounded p-2">
-                      <span className="text-[6.5px] uppercase font-black text-white/30 block mb-1.5">Hardware Constraints</span>
-                      <div className="grid grid-cols-2 gap-y-1.5 gap-x-2 font-mono text-[7px] text-white/60">
+                  <div className="bg-studio-bg rounded-xl p-3 border border-studio-border/50">
+                      <span className="text-[10px] uppercase font-bold text-studio-muted block mb-2 tracking-wider">Specifications</span>
+                      <div className="grid grid-cols-2 gap-y-2 gap-x-3 font-mono text-xs text-studio-text">
                          {Object.entries(bomData[selectedComponent].specs).map(([k, v]) => (
-                            <div key={k} className="flex justify-between border-b border-white/5 pb-0.5">
-                                <span className="text-white/40">{k}</span>
-                                <span className="text-emerald-200/80">{v as string}</span>
+                            <div key={k} className="flex flex-col border-b border-studio-border/50 pb-1">
+                                <span className="text-[9px] text-studio-muted uppercase">{k}</span>
+                                <span className="text-pack-accent font-bold">{v as string}</span>
                             </div>
                          ))}
                       </div>
@@ -385,9 +387,9 @@ export function CircuitViewport() {
                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
                    animate={{ opacity: 1, y: 0, scale: 1 }}
                    exit={{ opacity: 0, y: 20 }}
-                   className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#051510] text-emerald-400 border border-emerald-500/50 px-5 py-2.5 rounded shadow-2xl backdrop-blur-xl z-30 font-bold tracking-widest text-[8px] uppercase flex items-center gap-2"
+                   className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-pack-accent/10 text-pack-accent border border-pack-accent/30 px-6 py-3 rounded-full shadow-2xl backdrop-blur-xl z-30 font-bold tracking-widest text-xs uppercase flex items-center gap-3 md-elevation-2"
                 >
-                   <Activity className="w-3 h-3 animate-spin" />
+                   <Activity className="w-4 h-4 animate-spin" />
                    {generateLog}
                 </motion.div>
               )}
@@ -395,34 +397,34 @@ export function CircuitViewport() {
         </div>
 
         {/* Global Component Selection & Control Column */}
-        <div className="w-44 flex flex-col gap-2 shrink-0 z-10 transition-transform">
-          <div className="p-3 bg-white/[0.02] rounded border border-white/10 shadow-lg">
-            <div className="text-[7px] text-white/50 uppercase font-black mb-1.5 tracking-wider">Active Plane Modulator</div>
-            <div className="flex bg-black p-0.5 rounded gap-0.5 mb-3 border border-white/5">
-               <button onClick={() => setActiveLayer('top')} className={`flex-1 py-1.5 text-[7px] rounded uppercase font-bold transition-all ${activeLayer === 'top' ? 'bg-emerald-600 text-white shadow-lg' : 'text-white/40 hover:bg-white/10'}`}>TOP</button>
-               <button onClick={() => setActiveLayer('bottom')} className={`flex-1 py-1.5 text-[7px] rounded uppercase font-bold transition-all ${activeLayer === 'bottom' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/40 hover:bg-white/10'}`}>BOT</button>
-               <button onClick={() => setActiveLayer('silkscreen')} className={`flex-1 py-1.5 text-[7px] rounded uppercase font-bold transition-all ${activeLayer === 'silkscreen' ? 'bg-zinc-700 text-white shadow-lg' : 'text-white/40 hover:bg-white/10'}`}>SILK</button>
+        <div className="w-56 flex flex-col gap-4 shrink-0 z-10 transition-transform">
+          <div className="p-4 bg-studio-panel rounded-2xl border border-studio-border md-elevation-1">
+            <div className="text-[10px] text-studio-muted uppercase font-bold mb-3 tracking-wider">Active Plane Modulator</div>
+            <div className="flex bg-studio-bg p-1 rounded-xl gap-1 mb-4 border border-studio-border/50">
+               <button onClick={() => setActiveLayer('top')} className={`flex-1 py-2 text-xs rounded-lg uppercase font-bold transition-all ${activeLayer === 'top' ? 'bg-pack-accent text-white shadow-sm' : 'text-studio-muted hover:bg-studio-dots hover:text-studio-text'}`}>TOP</button>
+               <button onClick={() => setActiveLayer('bottom')} className={`flex-1 py-2 text-xs rounded-lg uppercase font-bold transition-all ${activeLayer === 'bottom' ? 'bg-studio-accent text-white shadow-sm' : 'text-studio-muted hover:bg-studio-dots hover:text-studio-text'}`}>BOT</button>
+               <button onClick={() => setActiveLayer('silkscreen')} className={`flex-1 py-2 text-xs rounded-lg uppercase font-bold transition-all ${activeLayer === 'silkscreen' ? 'bg-studio-muted text-white shadow-sm' : 'text-studio-muted hover:bg-studio-dots hover:text-studio-text'}`}>SILK</button>
             </div>
             
-            <div className="text-[7px] text-white/50 uppercase font-black mb-1.5 tracking-wider">Geometry Filtering</div>
-            <div className="flex flex-col gap-1">
-               <button onClick={() => setVisibleLayers(p => ({...p, top: !p.top}))} className={`flex items-center justify-between px-2 py-1.5 text-[7px] rounded transition-all border ${visibleLayers.top ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-black text-white/30 border-white/5 hover:bg-white/5'}`}>
+            <div className="text-[10px] text-studio-muted uppercase font-bold mb-2 tracking-wider">Geometry Filtering</div>
+            <div className="flex flex-col gap-2">
+               <button onClick={() => setVisibleLayers(p => ({...p, top: !p.top}))} className={`flex items-center justify-between px-3 py-2 text-xs rounded-xl transition-all border ${visibleLayers.top ? 'bg-pack-accent/10 text-pack-accent border-pack-accent/30' : 'bg-studio-bg text-studio-muted border-studio-border/50 hover:bg-studio-dots hover:text-studio-text'}`}>
                   <span className="font-bold">Top Copper</span>
-                  {visibleLayers.top ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                  {visibleLayers.top ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                </button>
-               <button onClick={() => setVisibleLayers(p => ({...p, bottom: !p.bottom}))} className={`flex items-center justify-between px-2 py-1.5 text-[7px] rounded transition-all border ${visibleLayers.bottom ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-black text-white/30 border-white/5 hover:bg-white/5'}`}>
+               <button onClick={() => setVisibleLayers(p => ({...p, bottom: !p.bottom}))} className={`flex items-center justify-between px-3 py-2 text-xs rounded-xl transition-all border ${visibleLayers.bottom ? 'bg-studio-accent/10 text-studio-accent border-studio-accent/30' : 'bg-studio-bg text-studio-muted border-studio-border/50 hover:bg-studio-dots hover:text-studio-text'}`}>
                   <span className="font-bold">Bottom Copper</span>
-                  {visibleLayers.bottom ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                  {visibleLayers.bottom ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                </button>
-               <button onClick={() => setVisibleLayers(p => ({...p, silkscreen: !p.silkscreen}))} className={`flex items-center justify-between px-2 py-1.5 text-[7px] rounded transition-all border ${visibleLayers.silkscreen ? 'bg-zinc-500/10 text-zinc-300 border-zinc-500/20' : 'bg-black text-white/30 border-white/5 hover:bg-white/5'}`}>
+               <button onClick={() => setVisibleLayers(p => ({...p, silkscreen: !p.silkscreen}))} className={`flex items-center justify-between px-3 py-2 text-xs rounded-xl transition-all border ${visibleLayers.silkscreen ? 'bg-studio-muted/10 text-studio-text border-studio-muted/30' : 'bg-studio-bg text-studio-muted border-studio-border/50 hover:bg-studio-dots hover:text-studio-text'}`}>
                   <span className="font-bold">Silkscreen</span>
-                  {visibleLayers.silkscreen ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                  {visibleLayers.silkscreen ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                </button>
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto space-y-1 pr-1 custom-scrollbar bg-black/20 p-2 rounded border border-white/5">
-             <div className="text-[7px] text-white/50 uppercase font-black mb-2 sticky top-0 bg-[#050505]/90 backdrop-blur-sm py-1 tracking-wider">Hardware Manifest</div>
+          <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar bg-studio-panel p-3 rounded-2xl border border-studio-border md-elevation-1">
+             <div className="text-[10px] text-studio-muted uppercase font-bold mb-3 sticky top-0 bg-studio-panel/90 backdrop-blur-sm py-1 tracking-wider z-10">Hardware Manifest</div>
              {bomData ? (
                  Object.entries(bomData).map(([refId, comp]) => (
                      <BOMItem 
@@ -434,8 +436,8 @@ export function CircuitViewport() {
                      />
                  ))
              ) : (
-                 <div className="flex items-center justify-center p-4">
-                     <Activity className="w-4 h-4 text-emerald-500/50 animate-spin" />
+                 <div className="flex items-center justify-center p-6">
+                     <Activity className="w-6 h-6 text-pack-accent/50 animate-spin" />
                  </div>
              )}
           </div>
@@ -443,9 +445,9 @@ export function CircuitViewport() {
           <button 
              onClick={handleGenerateGerber} 
              disabled={isExporting || !telemetry || telemetry.connection === 'OFFLINE'}
-             className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:cursor-not-allowed text-white text-[8px] font-black tracking-widest uppercase rounded border border-emerald-400/50 disabled:border-zinc-700 transition-all flex items-center justify-center gap-2 shadow-lg"
+             className="w-full py-4 bg-pack-accent hover:bg-pack-accent/90 disabled:bg-studio-dots disabled:text-studio-muted disabled:cursor-not-allowed text-white text-xs font-bold tracking-widest uppercase rounded-full transition-all flex items-center justify-center gap-2 md-elevation-2 active:scale-95"
           >
-            {isExporting ? <Activity className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+            {isExporting ? <Activity className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             {isExporting ? "STREAMING..." : (t("pcb.gerber") || "EXPORT GBR")}
           </button>
         </div>
@@ -458,10 +460,10 @@ function BOMItem({ ref_id, name, isSelected, onClick }: { ref_id: string, name: 
   return (
     <div 
         onClick={onClick}
-        className={`flex items-center justify-between px-2.5 py-2 rounded text-[8px] cursor-pointer transition-all ${isSelected ? 'bg-emerald-500/20 border-emerald-500/40 border shadow-inner' : 'bg-white/[0.02] border border-white/5 hover:bg-white/10 hover:border-white/20'}`}
+        className={`flex items-center justify-between px-4 py-3 rounded-xl text-xs cursor-pointer transition-all ${isSelected ? 'bg-pack-accent/10 border-pack-accent/30 border md-elevation-1' : 'bg-studio-bg border border-studio-border/50 hover:bg-studio-dots hover:border-studio-border'}`}
     >
-      <span className={`font-black tracking-wider ${isSelected ? 'text-emerald-400' : 'text-emerald-600'}`}>{ref_id}</span>
-      <span className={`truncate ml-2 font-bold ${isSelected ? 'text-white' : 'text-neutral-500'}`}>{name}</span>
+      <span className={`font-black tracking-wider ${isSelected ? 'text-pack-accent' : 'text-pack-accent/80'}`}>{ref_id}</span>
+      <span className={`truncate ml-3 font-semibold ${isSelected ? 'text-studio-text' : 'text-studio-muted'}`}>{name}</span>
     </div>
   );
 }
