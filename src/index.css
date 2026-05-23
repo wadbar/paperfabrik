@@ -27,9 +27,12 @@
     --md-sys-color-primary-container: #cbe6ff;
     --md-sys-color-on-primary-container: #001e30;
     --md-sys-color-secondary: #50606e;
+    --md-sys-color-secondary-container: #d3e4f5;
+    --md-sys-color-on-secondary-container: #0c1d29;
     --md-sys-color-background: #fcfcff;
     --md-sys-color-on-background: #1a1c1e;
     --md-sys-color-surface: #fcfcff;
+    --md-sys-color-surface-container-low: #f6f8fb;
     --md-sys-color-surface-container: #f0f4f9;
     --md-sys-color-surface-container-high: #e1e7ed;
     --md-sys-color-on-surface: #1a1c1e;
@@ -50,9 +53,12 @@
     --md-sys-color-primary-container: #004b71;
     --md-sys-color-on-primary-container: #cbe6ff;
     --md-sys-color-secondary: #b7c8d9;
+    --md-sys-color-secondary-container: #384856;
+    --md-sys-color-on-secondary-container: #d3e4f5;
     --md-sys-color-background: #1a1c1e;
     --md-sys-color-on-background: #e2e2e5;
     --md-sys-color-surface: #1a1c1e;
+    --md-sys-color-surface-container-low: #1e2023;
     --md-sys-color-surface-container: #202428;
     --md-sys-color-surface-container-high: #2b2f33;
     --md-sys-color-on-surface: #e2e2e5;
@@ -76,6 +82,51 @@
   
   *, *::before, *::after {
     transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+@layer components {
+  .m3-button-filled {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-medium transition-all active:scale-95;
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .m3-button-filled:hover {
+    opacity: 0.9;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+  }
+
+  .m3-button-tonal {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-medium transition-all active:scale-95;
+    background-color: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+  .m3-button-tonal:hover {
+    background-color: color-mix(in srgb, var(--md-sys-color-secondary-container), black 5%);
+  }
+  [data-theme="dark"] .m3-button-tonal:hover {
+    background-color: color-mix(in srgb, var(--md-sys-color-secondary-container), white 10%);
+  }
+
+  .m3-input {
+    @apply px-4 py-3 rounded-xl border transition-colors w-full focus:outline-none focus:ring-2;
+    background-color: var(--md-sys-color-surface-container);
+    color: var(--md-sys-color-on-surface);
+    border-color: var(--md-sys-color-outline-variant);
+  }
+  .m3-input:focus {
+    border-color: var(--md-sys-color-primary);
+    box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+  }
+  .m3-input::placeholder {
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .m3-card {
+    @apply rounded-[24px] overflow-hidden p-4 transition-all;
+    background-color: var(--md-sys-color-surface-container-low);
+    border: 1px solid var(--md-sys-color-outline-variant);
   }
 }
 

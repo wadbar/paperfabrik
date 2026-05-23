@@ -98,7 +98,7 @@ export default function App() {
                   type="text" 
                   value={searchFilter}
                   placeholder="Filter workspaces..." 
-                  className="w-full bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)] rounded-xl px-3 py-2 text-sm text-[var(--md-sys-color-on-surface)] placeholder-[var(--md-sys-color-on-surface-variant)] focus:outline-none focus:border-[var(--md-sys-color-primary)] transition-colors mb-2"
+                  className="m3-input mb-2 text-sm"
                   onChange={(e) => handleSearch(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') commitSearch(searchFilter);

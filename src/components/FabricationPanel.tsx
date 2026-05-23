@@ -39,7 +39,7 @@ export function FabricationPanel({
       animate={{ opacity: 1 }}
       onMouseEnter={() => recordEvent("PANEL_FOCUS_GAIN")}
       className={cn(
-        "bg-[var(--md-sys-color-surface-container)] relative flex h-full overflow-hidden",
+        "bg-[var(--md-sys-color-surface-container)] relative flex h-full overflow-hidden m3-card",
         className
       )}
     >
@@ -61,18 +61,16 @@ export function FabricationPanel({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
         <div className="flex justify-between items-center mb-6 shrink-0">
-          <h2 className={cn("text-lg font-bold flex items-center gap-3", accentColor)}>
+          <h2 className="text-lg font-bold flex items-center gap-3 text-[var(--md-sys-color-on-surface)]">
             {title} 
             <span className="hidden sm:inline-block text-sm text-[var(--md-sys-color-on-surface-variant)] font-normal tracking-wide px-3 py-1 bg-[var(--md-sys-color-surface-container-high)] rounded-full">{filename}</span>
           </h2>
           {actionText && (
             <button 
               onClick={handleAction}
-              className={cn("px-4 md:px-6 py-2 text-xs md:text-sm font-semibold rounded-full uppercase transition-all md-elevation-1 hover:md-elevation-2 active:scale-95 shrink-0", 
-              id_num === "01" ? "bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)]" : 
-              id_num === "03" ? "bg-pack-accent text-white" :
-              id_num === "04" ? "bg-apparel-accent text-white" : 
-              "border-2 border-wood-accent text-wood-accent hover:bg-wood-accent hover:text-white")}>
+              className={cn("text-xs md:text-sm shrink-0", 
+              id_num === "01" ? "m3-button-filled" : 
+              "m3-button-tonal")}>
               {actionText}
             </button>
           )}
@@ -85,3 +83,4 @@ export function FabricationPanel({
     </motion.section>
   );
 }
+

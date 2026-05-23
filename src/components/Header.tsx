@@ -4,17 +4,40 @@ import { useState, useEffect } from "react";
 
 export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
   const { language, setLanguage, t } = useI18n();
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme) {
+        return savedTheme === "dark";
+      }
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    return true; // Default fallback to dark
+  });
 
   useEffect(() => {
     if (isDark) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      document.documentElement.classList.add('dark'); // Keep this for tailwind class compatibility if needed.
+      document.documentElement.setAttribute("data-theme", "dark");
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.setAttribute('data-theme', 'light');
-      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute("data-theme", "light");
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
   }, [isDark]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      // Only auto-switch if the user hasn't explicitly set a preference
+      if (!localStorage.getItem("theme")) {
+        setIsDark(e.matches);
+      }
+    };
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
 
   const toggleLanguage = () => {
     setLanguage(language === 'en' ? 'pt' : 'en');
@@ -45,7 +68,7 @@ export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
       <div className="flex items-center gap-2 sm:gap-3 text-sm font-medium">
         <button 
            onClick={onOpenAI}
-           className="flex items-center gap-2 bg-[var(--md-sys-color-primary)] hover:opacity-90 text-[var(--md-sys-color-on-primary)] px-5 py-2.5 rounded-full transition-all group md-elevation-1 hover:md-elevation-2 active:scale-95"
+           className="m3-button-filled group"
         >
           <Brain className="w-4 h-4 group-hover:scale-110 transition-transform" />
           <span className="hidden sm:inline">AI COMPUTE</span>

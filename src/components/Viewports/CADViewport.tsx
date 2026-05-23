@@ -183,6 +183,7 @@ export function CADViewport() {
     wireframeColor: WIREFRAME_COLORS[0]
   });
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [showStressMap, setShowStressMap] = useState(false);
 
   const handleSaveSettings = () => {
     setSavedSettings(tempSettings);
@@ -847,15 +848,29 @@ export function CADViewport() {
                                  <path 
                                    key={i}
                                    d={face.path}
-                                   fill="none"
-                                   stroke="currentColor"
+                                   fill={showStressMap ? `hsla(${240 - (i / geometryData.faces.length) * 240}, 85%, 50%, 0.8)` : "none"}
+                                   stroke={showStressMap ? "rgba(255,255,255,0.1)" : "currentColor"}
                                    strokeWidth={0.5}
                                    strokeLinejoin="round"
-                                   className="opacity-70"
+                                   className="opacity-70 transition-colors duration-500"
                                  />
                                ))}
                              </g>
                           </svg>
+
+                          <div className="absolute top-4 left-4 flex gap-2 z-10">
+                             <button
+                               onClick={() => setShowStressMap(!showStressMap)}
+                               className={`px-3 py-1.5 text-[10px] rounded-lg tracking-wider font-bold shadow-lg transition-colors border backdrop-blur ${
+                                 showStressMap 
+                                   ? 'bg-orange-500/20 text-orange-400 border-orange-500/50' 
+                                   : 'bg-studio-panel/80 text-studio-text border-studio-border/50 hover:bg-studio-dots'
+                               }`}
+                             >
+                               {showStressMap ? 'HIDE STRESS MAP' : 'STRESS MAP'}
+                             </button>
+                          </div>
+
                           <div className="absolute bottom-4 left-4 flex gap-2">
                              <div className="px-3 py-1.5 bg-studio-panel/80 backdrop-blur border border-studio-border/50 text-xs text-studio-text rounded-lg tracking-wider font-bold shadow-lg">
                                 FORMAT: <span className="text-studio-accent">{savedSettings.outputFormat}</span>
