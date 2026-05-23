@@ -26,27 +26,6 @@ export function TerminalOverlay() {
     }
   }, [logs]);
 
-  const [miningLine, setMiningLine] = useState("");
-  useEffect(() => {
-    if (!isOpen || logs.length > 0) return;
-    const lines = [
-      "SEARCHING GITHUB: ALICEVISION/MESHROOM...",
-      "EXTRACTING FEATURE: PROJECTIVE_COMPUTE_V4",
-      "ANALYZING CHROMIUM Core: V8_ISOLATE_OPTIMIZATION",
-      "MINING VLC: BITSTREAM_PARSER_DECOUPLING",
-      "INTEGRATING BLENDER: B-MESH_TOPOLOGY_WELD",
-      "CROSS-REFERENCING OPENSEARCH: DISTRIBUTED_RECONSTRUCTION",
-      "ADAPTING KODI: SCRAPER_METADATA_DAEMON",
-      "OPTIMIZING RENDERING: WEBGL_INDEX_BUFFER_REUSE"
-    ];
-    let i = 0;
-    const interval = setInterval(() => {
-       setMiningLine(lines[i % lines.length]);
-       i++;
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [isOpen, logs.length]);
-
   return (
     <>
       <button 
@@ -103,12 +82,6 @@ export function TerminalOverlay() {
                         <div className="text-white/10 uppercase tracking-[0.2em] font-black text-center">
                             Listening for compute events
                         </div>
-                        {miningLine && (
-                          <div className="flex items-center gap-3">
-                             <div className="w-1 h-1 rounded-full bg-studio-accent animate-ping" />
-                             <span className="text-studio-accent font-bold opacity-60 animate-pulse text-[8px] tracking-widest">{miningLine}</span>
-                          </div>
-                        )}
                     </div>
                 ) : (
                     logs.map((log, i) => (

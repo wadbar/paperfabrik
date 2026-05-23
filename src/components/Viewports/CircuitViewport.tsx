@@ -57,8 +57,8 @@ export function CircuitViewport() {
       
       if (isMounted.current) {
         setTelemetry(prev => ({
-            load: Math.min(100, Math.max(0, prev.load + (Math.random() * 8 - 4) )), // CPU sim if API doesn't have load
-            gpu: Math.min(100, Math.max(0, prev.gpu + (Math.random() * 12 - 6) )), 
+            load: data.cpu ? parseFloat(data.cpu) : prev.load,
+            gpu: data.gpu ? parseFloat(data.gpu) : prev.gpu,
             ram: parseFloat(data.heapUsed || "0") / parseFloat(data.heapTotal || "1") * 100,
             connection: "SYNCED",
             faults: prev.faults

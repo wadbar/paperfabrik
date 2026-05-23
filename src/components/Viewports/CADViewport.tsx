@@ -31,7 +31,10 @@ interface RenderSettings {
   outputFormat: 'PNG' | 'JPG' | 'STL' | 'OBJ';
   shading: "Wireframe" | "Solid" | "Realistic" | "Stress";
   wireframeThickness: number;
+  wireframeColor: string;
 }
+
+const WIREFRAME_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
 export function CADViewport() {
   const { t } = useI18n();
@@ -168,14 +171,16 @@ export function CADViewport() {
     antiAliasing: true,
     outputFormat: 'OBJ',
     shading: "Solid",
-    wireframeThickness: 1.5
+    wireframeThickness: 1.5,
+    wireframeColor: WIREFRAME_COLORS[0]
   });
   const [savedSettings, setSavedSettings] = useState<RenderSettings>({
     resolution: 'Medium',
     antiAliasing: true,
     outputFormat: 'OBJ',
     shading: "Solid",
-    wireframeThickness: 1.5
+    wireframeThickness: 1.5,
+    wireframeColor: WIREFRAME_COLORS[0]
   });
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
@@ -462,7 +467,9 @@ export function CADViewport() {
            >
               <motion.div 
                 layout
-                className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-3 px-4 flex flex-col gap-2 shadow-2xl ring-1 ring-white/5 pointer-events-auto"
+                whileHover={{ scale: 1.02, y: -2, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)' }}
+                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-3 px-4 flex flex-col gap-2 shadow-2xl ring-1 ring-white/5 pointer-events-auto transition-shadow"
               >
                 <header className="flex items-center justify-between gap-8">
                   <span className="text-[9px] text-white/30 uppercase font-black tracking-[0.2em] leading-none">Status_HUD_0.4</span>
@@ -505,22 +512,47 @@ export function CADViewport() {
                   <HUDItem icon={Orbit} value={`${(orbit.ry * 57.3).toFixed(1)}°`} label="Rotation" />
                   <HUDItem icon={Layers} value={savedSettings.shading} label="Mode" highlight />
                 </div>
-
+                
                 <AnimatePresence initial={false}>
                   {showWireframeOverlay && (
                     <motion.div
                       layout
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
+                      initial={{ opacity: 0, scale: 0.95, height: 0 }}
+                      animate={{ opacity: 1, scale: 1, height: "auto" }}
+                      exit={{ opacity: 0, scale: 0.95, height: 0 }}
+                      whileHover={{ scale: 1.02, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2)' }}
+                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                      className="overflow-hidden bg-white/5 rounded-lg p-2 mt-2 border border-white/10"
                     >
-                      <div className="mt-2 pt-2 border-t border-white/5 space-y-1.5 flex items-center justify-between">
-                         <div className="flex items-center gap-2">
-                            <Box className="w-3 h-3 text-blue-400" />
-                            <span className="text-[7px] text-white/50 tracking-[0.1em] font-black uppercase">WIREFRAME_ACTIVE</span>
+                      {/* Independent Wireframe Color Swatches */}
+                      <div className="pb-2">
+                         <div className="flex items-center justify-between">
+                           <span className="text-[7px] text-white/50 uppercase tracking-[0.1em] font-black">Line_Color</span>
+                           <div className="flex items-center gap-2 pointer-events-auto">
+                              {WIREFRAME_COLORS.map(color => (
+                                <button
+                                  key={color}
+                                  onClick={(e) => {
+                                     e.stopPropagation();
+                                     setSavedSettings(prev => ({ ...prev, wireframeColor: color }));
+                                     setTempSettings(prev => ({ ...prev, wireframeColor: color }));
+                                  }}
+                                  className={`w-3.5 h-3.5 rounded-full border border-white/20 hover:scale-125 active:scale-95 transition-transform ${savedSettings.wireframeColor === color ? 'ring-2 ring-white/50 scale-110 shadow-lg' : 'opacity-60 hover:opacity-100'}`}
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                           </div>
                          </div>
-                         <span className="text-[9px] text-blue-400 font-mono">{savedSettings.wireframeThickness}px</span>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/10 space-y-3">
+                         <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-2">
+                              <Box className="w-3 h-3 text-blue-400" style={{ color: savedSettings.wireframeColor }} />
+                              <span className="text-[7px] text-white/50 tracking-[0.1em] font-black uppercase">WIREFRAME_ACTIVE</span>
+                           </div>
+                           <span className="text-[9px] font-mono" style={{ color: savedSettings.wireframeColor }}>{savedSettings.wireframeThickness}px</span>
+                         </div>
                       </div>
                     </motion.div>
                   )}
@@ -627,7 +659,7 @@ export function CADViewport() {
                     key={i}
                     d={face.path}
                     fill={face.fill}
-                    stroke={savedSettings.shading === "Wireframe" ? "rgba(59, 130, 246, 0.7)" : (showWireframeOverlay ? "rgba(255, 255, 255, 0.08)" : "transparent")}
+                    stroke={savedSettings.shading === "Wireframe" ? savedSettings.wireframeColor : (showWireframeOverlay ? savedSettings.wireframeColor : "transparent")}
                     strokeWidth={savedSettings.shading === "Wireframe" ? (savedSettings.wireframeThickness / zoom) : (showWireframeOverlay ? currentStrokeWidth : 0)}
                     strokeLinejoin="round"
                     className="transition-colors hover:stroke-blue-400 cursor-crosshair"
@@ -682,83 +714,91 @@ export function CADViewport() {
                   initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
                   animate={{ opacity: 1, backdropFilter: 'blur(4px)' }}
                   exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-                  className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 p-6"
+                  className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 p-6"
                   onClick={() => setIsSettingsOpen(false)}
                 >
                   <motion.div 
-                    initial={{ scale: 0.95, y: 20 }}
+                    initial={{ scale: 0.95, y: 30 }}
                     animate={{ scale: 1, y: 0 }}
-                    exit={{ scale: 0.95, y: 20 }}
-                    className="w-full max-w-sm bg-[#0a0a0b] border border-white/10 rounded-2xl shadow-3xl overflow-hidden flex flex-col ring-1 ring-white/5"
+                    exit={{ scale: 0.95, y: 30 }}
+                    className="w-full max-w-sm bg-studio-panel text-studio-text rounded-3xl shadow-2xl overflow-hidden flex flex-col md-elevation-3"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <header className="px-5 py-4 border-b border-white/5 flex items-center justify-between bg-white/2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 bg-blue-500/10 rounded-lg border border-blue-500/20"><Settings2 className="w-4 h-4 text-blue-400" /></div>
-                        <span className="font-black text-[10px] uppercase tracking-[0.15em] text-white/90">Viewport Protocol</span>
+                    <header className="px-6 py-5 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-studio-accent/10 rounded-full"><Settings2 className="w-5 h-5 text-studio-accent" /></div>
+                        <span className="font-bold text-sm tracking-wide">Viewport Protocol</span>
                       </div>
-                      <button onClick={() => setIsSettingsOpen(false)} className="p-1.5 hover:bg-white/5 rounded-full text-white/30 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
+                      <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-studio-dots rounded-full text-studio-muted hover:text-studio-text transition-colors"><X className="w-5 h-5" /></button>
                     </header>
 
-                    <div className="p-6 space-y-8">
-                      <div className="space-y-4">
-                        <label className="text-[8px] text-white/30 uppercase font-bold tracking-widest">Projection Quality</label>
-                        <div className="flex bg-white/2 p-1 rounded-xl border border-white/5">
+                    <div className="px-6 pb-6 space-y-6">
+                      <div className="space-y-3">
+                        <label className="text-xs text-studio-text font-bold">Projection Quality</label>
+                        <div className="flex bg-studio-bg rounded-2xl p-1 shadow-inner">
                            {(['Low', 'Medium', 'High'] as const).map(res => (
-                             <button key={res} onClick={() => setTempSettings({ ...tempSettings, resolution: res })} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-lg transition-all ${tempSettings.resolution === res ? 'bg-blue-600 text-white shadow-lg' : 'text-white/40 hover:text-white/70'}`}>{res}</button>
+                             <button key={res} onClick={() => setTempSettings({ ...tempSettings, resolution: res })} className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${tempSettings.resolution === res ? 'bg-studio-panel shadow-md text-studio-accent' : 'text-studio-muted hover:text-studio-text hover:bg-white/5'}`}>{res}</button>
                            ))}
                         </div>
                       </div>
 
-                      <div className="space-y-4">
-                        <label className="text-[8px] text-white/30 uppercase font-bold tracking-widest">Shading Algorithm</label>
-                        <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-3">
+                        <label className="text-xs text-studio-text font-bold">Shading Algorithm</label>
+                        <div className="grid grid-cols-2 gap-3">
                            {(['Wireframe', 'Solid', 'Realistic', 'Stress'] as const).map(mode => (
                              <button 
                                 key={mode} 
                                 onClick={() => setTempSettings({ ...tempSettings, shading: mode })}
-                                className={`py-3 px-4 text-[9px] font-bold uppercase rounded-xl border transition-all text-left flex items-center justify-between group ${tempSettings.shading === mode ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-black/40 border-white/5 text-white/30 hover:border-white/10 hover:text-white/60'}`}
+                                className={`py-4 px-4 text-xs font-bold rounded-2xl border transition-all text-left flex items-center justify-between group ${tempSettings.shading === mode ? 'bg-studio-accent/10 border-studio-accent text-studio-accent' : 'bg-studio-bg border-transparent text-studio-muted hover:bg-studio-dots hover:text-studio-text'}`}
                              >
                                {mode}
-                               {tempSettings.shading === mode && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
+                               {tempSettings.shading === mode && <Check className="w-4 h-4" />}
                              </button>
                            ))}
                         </div>
                       </div>
-                       <div className="flex items-center justify-between p-4 bg-white/2 rounded-2xl border border-white/5">
+                       <div className="flex flex-row items-center justify-between p-4 bg-studio-bg rounded-2xl focus-within:ring-2 focus-within:ring-studio-accent transition-shadow">
                         <div className="flex flex-col gap-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">Vector Smoothing</span>
-                          <span className="text-[7px] text-white/30">Enable high-fidelity anti-aliasing</span>
+                          <label htmlFor="aa-toggle" className="text-xs font-bold text-studio-text cursor-pointer">Vector Smoothing</label>
+                          <span className="text-[10px] text-studio-muted">Enable high-fidelity anti-aliasing</span>
                         </div>
                         <input 
+                           id="aa-toggle"
                            type="checkbox" 
                            checked={tempSettings.antiAliasing}
                            onChange={e => setTempSettings({ ...tempSettings, antiAliasing: e.target.checked })}
-                           className="w-10 h-5 appearance-none bg-white/5 border border-white/10 rounded-full checked:bg-blue-600 transition-all cursor-pointer relative after:content-[''] after:absolute after:top-1 after:left-1 after:w-3 after:h-3 after:bg-white/20 after:rounded-full checked:after:translate-x-5 checked:after:bg-white after:transition-all"
+                           className="w-12 h-6 appearance-none bg-studio-border rounded-full checked:bg-studio-accent transition-all cursor-pointer relative after:content-[''] after:absolute after:top-1 after:left-1 after:w-4 after:h-4 after:bg-white after:rounded-full checked:after:translate-x-6 after:transition-all hover:bg-studio-border/80"
                         />
                       </div>
 
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <div className="flex justify-between items-center">
-                           <label className="text-[8px] text-white/30 uppercase font-bold tracking-widest">Wireframe Weight</label>
-                           <span className="text-[9px] text-blue-400 font-mono">{tempSettings.wireframeThickness.toFixed(1)}px</span>
+                           <label htmlFor="wf-slider" className="text-xs text-studio-text font-bold">Wireframe Weight</label>
+                           <span className="text-sm font-bold text-studio-accent">{tempSettings.wireframeThickness.toFixed(1)}px</span>
                         </div>
-                        <input 
-                           type="range" 
-                           min="0.1" 
-                           max="5.0" 
-                           step="0.1"
-                           value={tempSettings.wireframeThickness}
-                           onChange={e => setTempSettings({ ...tempSettings, wireframeThickness: parseFloat(e.target.value) })}
-                           className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 [mask-image:linear-gradient(to_right,white,transparent)] active:[mask-image:none] transition-all"
-                        />
+                        <div className="bg-studio-bg p-4 rounded-2xl">
+                          <input 
+                             id="wf-slider"
+                             type="range" 
+                             min="0.1" 
+                             max="5.0" 
+                             step="0.1"
+                             value={tempSettings.wireframeThickness}
+                             onChange={e => {
+                               const val = parseFloat(e.target.value);
+                               setTempSettings({ ...tempSettings, wireframeThickness: val });
+                               setSavedSettings(prev => ({ ...prev, wireframeThickness: val }));
+                             }}
+                             className="w-full h-2 bg-studio-border rounded-lg appearance-none cursor-pointer accent-studio-accent hover:accent-studio-accent/80 transition-all"
+                          />
+                        </div>
                       </div>
 
                     </div>
 
-                    <footer className="px-5 py-5 border-t border-white/5 flex gap-3">
-                      <button onClick={() => setIsSettingsOpen(false)} className="flex-1 py-3 text-[9px] font-black tracking-widest uppercase rounded-xl border border-white/10 hover:bg-white/5 text-white/40 transition-colors">Discard</button>
-                      <button onClick={handleSaveSettings} className="flex-1 py-3 bg-blue-600 text-white text-[9px] font-black tracking-widest uppercase rounded-xl shadow-[0_10px_20px_-5px_rgba(37,99,235,0.4)] active:scale-95 transition-all">Apply_Settings</button>
+                    <footer className="p-4 bg-studio-bg border-t border-white/5 flex gap-3 rounded-b-3xl">
+                      <button onClick={() => setIsSettingsOpen(false)} className="flex-1 py-4 text-sm font-bold uppercase rounded-xl hover:bg-studio-dots text-studio-muted hover:text-studio-text transition-colors min-h-[48px]">Discard</button>
+                      <button onClick={handleSaveSettings} className="flex-1 py-4 bg-studio-accent text-white text-sm font-bold uppercase rounded-xl md-elevation-1 hover:md-elevation-2 active:scale-95 transition-all min-h-[48px]">Apply_Settings</button>
                     </footer>
                   </motion.div>
                 </motion.div>

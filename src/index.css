@@ -43,7 +43,7 @@
     --md-sys-color-apparel: #9a25b1;
   }
 
-  .dark {
+  [data-theme="dark"] {
     /* MD3 Dark Theme */
     --md-sys-color-primary: #8ecdff;
     --md-sys-color-on-primary: #003450;
@@ -72,6 +72,10 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  *, *::before, *::after {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   }
 }
 

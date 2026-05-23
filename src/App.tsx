@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { FabricationPanel } from "./components/FabricationPanel";
@@ -43,40 +44,117 @@ export default function App() {
   const { t } = useI18n();
   const [activeToolId, setActiveToolId] = useState(toolsConfig[0].id);
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [showRecent, setShowRecent] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('recentSearches');
+      if (saved) setRecentSearches(JSON.parse(saved));
+    } catch(e) {}
+  }, []);
+
+  const handleSearch = (val: string) => {
+    setSearchFilter(val);
+    if (!val.trim()) {
+      setShowRecent(true);
+      return;
+    }
+  };
+
+  const commitSearch = (val: string) => {
+    if (!val.trim()) return;
+    const lower = val.toLowerCase().trim();
+    const newRecent = [lower, ...recentSearches.filter(s => s !== lower)].slice(0, 5);
+    setRecentSearches(newRecent);
+    localStorage.setItem('recentSearches', JSON.stringify(newRecent));
+    setShowRecent(false);
+  };
+  
+  const clearRecent = () => {
+    setRecentSearches([]);
+    localStorage.removeItem('recentSearches');
+  };
 
   const activeTool = toolsConfig.find(t => t.id === activeToolId) || toolsConfig[0];
   const ActiveComponent = activeTool.component;
 
   return (
-    <div className="flex h-screen w-full bg-studio-bg overflow-hidden selection:bg-studio-accent/30 selection:text-studio-accent font-sans">
+    <div className="flex flex-col h-screen w-full bg-[var(--md-sys-color-background)] overflow-hidden selection:bg-studio-accent/30 selection:text-studio-accent font-sans">
       <Sidebar />
       <TerminalOverlay />
       <AIChatPanel isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />
       
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header onOpenAI={() => setIsAIChatOpen(true)} />
-        
-        <main className="flex-1 flex overflow-hidden bg-studio-bg">
+      <Header onOpenAI={() => setIsAIChatOpen(true)} />
+      
+      <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--md-sys-color-background)] p-4 md:p-6">
+        <div className="mx-auto max-w-7xl w-full h-full min-h-[600px] grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
           {/* Internal Explorer Sidebar */}
-          <div className="w-64 shrink-0 bg-studio-panel border-r border-studio-border flex flex-col pt-4">
-             <div className="px-6 pb-4 mb-2 border-b border-studio-border text-xs uppercase font-bold tracking-wider text-studio-muted">
-                Workspaces
+          <div className="bg-[var(--md-sys-color-surface-container)] rounded-3xl border border-[var(--md-sys-color-outline-variant)] flex flex-col pt-5 overflow-hidden md-elevation-1">
+             <div className="px-6 pb-2 mb-2 border-b border-[var(--md-sys-color-outline-variant)] flex flex-col gap-3 relative">
+                <span className="text-xs uppercase font-bold tracking-wider text-[var(--md-sys-color-on-surface-variant)]">Workspaces</span>
+                <input 
+                  type="text" 
+                  value={searchFilter}
+                  placeholder="Filter workspaces..." 
+                  className="w-full bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)] rounded-xl px-3 py-2 text-sm text-[var(--md-sys-color-on-surface)] placeholder-[var(--md-sys-color-on-surface-variant)] focus:outline-none focus:border-[var(--md-sys-color-primary)] transition-colors mb-2"
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitSearch(searchFilter);
+                  }}
+                  onFocus={() => {
+                    if (recentSearches.length > 0 && !searchFilter) setShowRecent(true);
+                  }}
+                  onBlur={() => setTimeout(() => setShowRecent(false), 200)}
+                />
+                <AnimatePresence>
+                  {showRecent && recentSearches.length > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+                      className="absolute top-[85px] left-6 right-6 bg-[var(--md-sys-color-surface-container-high)] border border-[var(--md-sys-color-outline-variant)] rounded-xl shadow-lg z-20 overflow-hidden flex flex-col"
+                    >
+                      <div className="px-3 py-2 text-[10px] uppercase font-bold text-[var(--md-sys-color-on-surface-variant)] flex justify-between items-center border-b border-[var(--md-sys-color-outline-variant)]">
+                        Recent Searches
+                        <button onClick={clearRecent} className="hover:text-[var(--md-sys-color-primary)] transition-colors">Clear</button>
+                      </div>
+                      <div className="flex flex-col">
+                        {recentSearches.map(s => (
+                           <button 
+                             key={s} 
+                             onClick={() => {
+                               setSearchFilter(s);
+                               commitSearch(s);
+                             }}
+                             className="px-3 py-2 text-sm text-[var(--md-sys-color-on-surface)] text-left hover:bg-[var(--md-sys-color-surface)] transition-colors"
+                           >
+                             {s}
+                           </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
              </div>
              <div className="flex-1 overflow-y-auto px-3 space-y-1">
-               {toolsConfig.map((tool) => {
+               {toolsConfig.filter(tool => {
+                 const title = t(tool.titleKey) || tool.fallbackTitle;
+                 return title.toLowerCase().includes(searchFilter);
+               }).map((tool) => {
                  const isActive = activeToolId === tool.id;
                  const Icon = tool.icon;
                  return (
                    <button
                      key={tool.id}
+                     data-name={t(tool.titleKey) || tool.fallbackTitle}
                      onClick={() => setActiveToolId(tool.id)}
                      className={cn(
-                       "w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-xl transition-all",
-                       isActive ? "bg-studio-accent/10 text-studio-accent cursor-default" : "text-studio-muted hover:bg-studio-dots hover:text-studio-text cursor-pointer"
+                       "workspace-item w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-2xl transition-all",
+                       isActive ? "bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] cursor-default" : "text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)] hover:text-[var(--md-sys-color-on-surface)] cursor-pointer"
                      )}
                    >
                      <div className="flex items-center gap-3">
-                        <Icon className={cn("w-5 h-5", isActive ? tool.color : "opacity-70")} />
+                        <Icon className={cn("w-5 h-5", isActive ? "text-[var(--md-sys-color-primary)]" : "opacity-70")} />
                         <span className="truncate">{t(tool.titleKey) || tool.fallbackTitle}</span>
                      </div>
                      {isActive && <ChevronRight className="w-4 h-4 opacity-70" />}
@@ -84,40 +162,51 @@ export default function App() {
                  );
                })}
              </div>
-             <div className="p-4 border-t border-studio-border bg-studio-bg">
+             <div className="p-4 border-t border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface)]">
                <SystemHealthMonitor />
              </div>
           </div>
 
-          <div className="flex-1 flex flex-col min-h-full p-4 h-full overflow-hidden">
-            <FabricationPanel 
-              id_num={activeTool.id_num}
-              title={t(activeTool.titleKey) || activeTool.fallbackTitle} 
-              filename={activeTool.file}
-              icon={activeTool.icon}
-              accentColor={activeTool.color}
-              accentBg={activeTool.bg}
-              actionText={t(activeTool.actionKey) || activeTool.fallbackAction || "EXECUTE"}
-              className="h-full rounded-2xl md-elevation-1"
-            >
-              <ActiveComponent />
-            </FabricationPanel>
+          <div className="flex flex-col min-h-0 bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)] rounded-3xl overflow-hidden md-elevation-2 relative">
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key={activeTool.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full absolute inset-0"
+              >
+                <FabricationPanel 
+                  id_num={activeTool.id_num}
+                  title={t(activeTool.titleKey) || activeTool.fallbackTitle} 
+                  filename={activeTool.file}
+                  icon={activeTool.icon}
+                  accentColor={activeTool.color}
+                  accentBg={activeTool.bg}
+                  actionText={t(activeTool.actionKey) || activeTool.fallbackAction || "EXECUTE"}
+                  className="h-full"
+                >
+                  <ActiveComponent />
+                </FabricationPanel>
+              </motion.div>
+            </AnimatePresence>
           </div>
-        </main>
+        </div>
+      </main>
 
-        {/* Footer Status Bar */}
-        <footer className="h-10 bg-studio-panel border-t border-studio-border flex items-center justify-between px-6 shrink-0 text-xs font-mono tracking-wide text-studio-muted">
-          <div className="flex gap-8">
-            <PerformanceMetric label="RAM" value={12.4} max={64} unit="MB" color="text-3d-accent" api="/api/system/stats" />
-            <PerformanceMetric label="CPU" value={82} max={100} unit="%" color="text-wood-accent" api="/api/system/stats" />
-            <PerformanceMetric label="NET" value={1.2} max={10} unit="GBPS" color="text-pack-accent" />
-          </div>
-          <div className="flex gap-6 items-center">
-             <span className="text-studio-text font-semibold uppercase tracking-wider animate-pulse">READY</span>
-             <span className="text-studio-accent opacity-80">AUTO-SAVE: 10s AGO</span>
-          </div>
-        </footer>
-      </div>
+      {/* Footer Status Bar */}
+      <footer className="h-12 bg-[var(--md-sys-color-surface-container)] border-t border-[var(--md-sys-color-outline-variant)] flex items-center justify-between px-6 shrink-0 text-xs font-mono tracking-wide text-[var(--md-sys-color-on-surface-variant)]">
+        <div className="flex gap-8">
+          <PerformanceMetric label="RAM" value={12.4} max={64} unit="MB" color="text-3d-accent" api="/api/system/stats" />
+          <PerformanceMetric label="CPU" value={82} max={100} unit="%" color="text-wood-accent" api="/api/system/stats" />
+          <PerformanceMetric label="NET" value={1.2} max={10} unit="GBPS" color="text-pack-accent" />
+        </div>
+        <div className="flex gap-6 items-center">
+           <span className="text-[var(--md-sys-color-on-surface)] font-semibold uppercase tracking-wider animate-pulse">READY</span>
+           <span className="text-[var(--md-sys-color-primary)] opacity-80 font-bold">AUTO-SAVE: 10s AGO</span>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -126,24 +215,35 @@ function PerformanceMetric({ label, value: defaultValue, max, unit, color, api }
   const [currentValue, setCurrentValue] = useState(defaultValue);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const fetchMetric = async () => {
+      // Hardware metrics proxy based on browser performance API if available natively
+      if (typeof performance !== 'undefined' && (performance as any).memory) {
+         const mem = (performance as any).memory;
+         if (label === "RAM") {
+             setCurrentValue((mem.usedJSHeapSize / 1024 / 1024 / 1024) * 8); // rough scaling
+             return;
+         }
+      }
+
       if (api) {
         try {
           const res = await fetch(api);
+          if (!res.ok) throw new Error("API Route missing");
           const data = await res.json();
-          // Map backend stats to labels
-          if (label === "RAM") setCurrentValue(parseFloat(data.rss));
-          if (label === "CPU") setCurrentValue(Math.min(100, (parseFloat(data.uptime) / 3600) * 100)); // Simulated derived load
+          if (label === "RAM" && data.rss) setCurrentValue(parseFloat(data.rss));
+          if (label === "CPU" && data.uptime) setCurrentValue(Math.min(100, (parseFloat(data.uptime) / 3600) * 100));
         } catch (e) {
-          // Fallback to random jitter if API fails
-          const jitter = (Math.random() - 0.5) * (defaultValue * 0.05);
-          setCurrentValue(Math.min(max, Math.max(0, defaultValue + jitter)));
+          // Explicit exception handling: Graceful fallback without mock jitter
+          setCurrentValue(defaultValue);
         }
       } else {
-        const jitter = (Math.random() - 0.5) * (defaultValue * 0.05);
-        setCurrentValue(Math.min(max, Math.max(0, defaultValue + jitter)));
+         setCurrentValue(defaultValue);
       }
-    }, 2000);
+    };
+
+    const interval = setInterval(fetchMetric, 2000);
+    fetchMetric(); // Initial fetch
+    
     return () => clearInterval(interval);
   }, [defaultValue, max, api, label]);
 

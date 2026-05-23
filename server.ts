@@ -354,16 +354,71 @@ if (!isMainThread) {
     });
 
     app.post("/api/mesh/filter", (req, res) => {
-      const { filterType, meshData } = req.body;
-      logger.info("MESH_COMPUTE", `Applying filter: ${filterType}`, { vertexCount: meshData?.vertices?.length });
-      
-      // Real-world filter response logic
-      res.json({
-        status: "success",
-        processedNodes: 1,
-        executionTime: "45ms",
-        delta: 0.0012
-      });
+      try {
+        const { filterType, meshData } = req.body;
+        logger.info("MESH_COMPUTE", `Applying filter: ${filterType}`, { vertexCount: meshData?.vertices?.length });
+        
+        if (!meshData || !Array.isArray(meshData.vertices)) {
+          return res.status(400).json({ status: "error", message: "Invalid mesh data provided." });
+        }
+
+        const start = performance.now();
+        let processedNodes = 0;
+        let delta = 0;
+
+        // Apply a real Laplacian smoothing filter to the mesh vertices
+        if (filterType === "laplacian" && meshData.faces) {
+           const vertices = [...meshData.vertices];
+           const newVertices = new Array(vertices.length);
+           const neighborCounts = new Array(vertices.length).fill(0);
+           const neighborSums = Array.from({ length: vertices.length }, () => ({ x: 0, y: 0, z: 0 }));
+
+           for (const face of meshData.faces) {
+             for (let i = 0; i < face.length; i++) {
+               const v1 = face[i];
+               const v2 = face[(i + 1) % face.length];
+
+               neighborCounts[v1]++;
+               neighborSums[v1].x += vertices[v2].x;
+               neighborSums[v1].y += vertices[v2].y;
+               neighborSums[v1].z += vertices[v2].z;
+               
+               neighborCounts[v2]++;
+               neighborSums[v2].x += vertices[v1].x;
+               neighborSums[v2].y += vertices[v1].y;
+               neighborSums[v2].z += vertices[v1].z;
+             }
+           }
+
+           for (let i = 0; i < vertices.length; i++) {
+               if (neighborCounts[i] > 0) {
+                 newVertices[i] = {
+                   x: neighborSums[i].x / neighborCounts[i],
+                   y: neighborSums[i].y / neighborCounts[i],
+                   z: neighborSums[i].z / neighborCounts[i]
+                 };
+                 delta += Math.abs(newVertices[i].x - vertices[i].x) + Math.abs(newVertices[i].y - vertices[i].y) + Math.abs(newVertices[i].z - vertices[i].z);
+                 processedNodes++;
+               } else {
+                 newVertices[i] = vertices[i];
+               }
+           }
+           meshData.vertices = newVertices;
+        }
+
+        const end = performance.now();
+        
+        res.json({
+          status: "success",
+          processedNodes,
+          executionTime: `${(end - start).toFixed(2)}ms`,
+          delta: Number((delta / processedNodes || 0).toFixed(6)),
+          meshData
+        });
+      } catch (err: any) {
+        logger.error("MESH_COMPUTE", "Filter computation failed", { error: err.message });
+        res.status(500).json({ status: "error", message: err.message });
+      }
     });
 
     app.post("/api/telemetry/logs", (req, res) => {

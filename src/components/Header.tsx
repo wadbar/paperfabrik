@@ -8,8 +8,10 @@ export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
 
   useEffect(() => {
     if (isDark) {
-      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.classList.add('dark'); // Keep this for tailwind class compatibility if needed.
     } else {
+      document.documentElement.setAttribute('data-theme', 'light');
       document.documentElement.classList.remove('dark');
     }
   }, [isDark]);
@@ -23,36 +25,35 @@ export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
   };
 
   return (
-    <header className="h-16 bg-studio-panel border-b border-studio-border flex items-center justify-between px-6 shrink-0 md-elevation-1">
-      <div className="flex items-center gap-8">
+    <header className="h-16 lg:h-20 bg-[var(--md-sys-color-surface)] flex items-center justify-between px-4 sm:px-6 shrink-0 border-b border-[var(--md-sys-color-outline-variant)]">
+      <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-studio-accent rounded-full flex items-center justify-center elevation-2">
-            <div className="w-4 h-4 border-[2.5px] border-white rotate-45"></div>
+          <div className="w-10 h-10 bg-[var(--md-sys-color-primary-container)] rounded-xl flex items-center justify-center">
+            <div className="w-5 h-5 border-[3px] border-[var(--md-sys-color-on-primary-container)] rotate-45 rounded-sm"></div>
           </div>
-          <span className="text-xl font-bold tracking-tight text-studio-text">
-            {t('app.title')} <span className="text-studio-accent text-xs align-top font-medium ml-1 bg-studio-accent/10 px-2 py-0.5 rounded-full">PRO v4.3</span>
+          <span className="text-xl lg:text-2xl font-bold tracking-tight text-[var(--md-sys-color-on-surface)] hidden sm:block">
+            {t('app.title')} <span className="text-[var(--md-sys-color-primary)] text-xs align-top font-bold ml-1 bg-[var(--md-sys-color-primary-container)] px-2 py-0.5 rounded-full">PRO v4.3</span>
           </span>
         </div>
-        <nav className="hidden md:flex gap-6 text-sm font-medium opacity-80">
-          <span className="text-studio-accent font-bold">Workspace</span>
-          <span className="hover:text-studio-text transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-studio-dots/50">{t('nav.libraries') || 'Libraries'}</span>
-          <span className="hover:text-studio-text transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-studio-dots/50">{t('nav.machine_queue') || 'Machine Queue'}</span>
-          <span className="hover:text-studio-text transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-studio-dots/50">{t('nav.cloud_sync') || 'Cloud Sync'}</span>
+        <nav className="hidden md:flex gap-2 text-sm font-medium">
+          <button className="text-[var(--md-sys-color-on-surface)] font-bold px-4 py-2 bg-[var(--md-sys-color-surface-container-high)] rounded-full transition-colors">Workspace</button>
+          <button className="text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container)] px-4 py-2 rounded-full transition-colors">{t('nav.libraries') || 'Libraries'}</button>
+          <button className="text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container)] px-4 py-2 rounded-full transition-colors">{t('nav.machine_queue') || 'Machine Queue'}</button>
         </nav>
       </div>
 
-      <div className="flex items-center gap-4 text-sm font-medium">
+      <div className="flex items-center gap-2 sm:gap-3 text-sm font-medium">
         <button 
            onClick={onOpenAI}
-           className="flex items-center gap-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 px-4 py-2 rounded-full border border-purple-500/20 transition-all group"
+           className="flex items-center gap-2 bg-[var(--md-sys-color-primary)] hover:opacity-90 text-[var(--md-sys-color-on-primary)] px-5 py-2.5 rounded-full transition-all group md-elevation-1 hover:md-elevation-2 active:scale-95"
         >
           <Brain className="w-4 h-4 group-hover:scale-110 transition-transform" />
-          <span>AI COMPUTE</span>
+          <span className="hidden sm:inline">AI COMPUTE</span>
         </button>
 
         <button 
           onClick={toggleTheme}
-          className="w-10 h-10 flex items-center justify-center rounded-full text-studio-muted hover:text-studio-text hover:bg-studio-dots transition-all"
+          className="w-12 h-12 flex items-center justify-center rounded-full text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)] hover:text-[var(--md-sys-color-on-surface)] transition-all"
           aria-label="Toggle Theme"
         >
           {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -60,15 +61,11 @@ export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
 
         <button 
           onClick={toggleLanguage}
-          className="flex items-center gap-2 px-3 py-2 rounded-full text-studio-muted hover:text-studio-text hover:bg-studio-dots transition-all"
+          className="w-12 h-12 sm:w-auto sm:px-4 sm:h-12 flex items-center justify-center gap-2 rounded-full text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)] hover:text-[var(--md-sys-color-on-surface)] transition-all"
         >
-          <Globe className="w-4 h-4" />
-          <span>{language === 'en' ? 'EN' : 'PT'}</span>
+          <Globe className="w-5 h-5" />
+          <span className="hidden sm:inline">{language === 'en' ? 'EN' : 'PT'}</span>
         </button>
-        <div className="hidden sm:flex gap-2 items-center px-3 py-1.5 rounded-full bg-studio-dots">
-          <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
-          <span className="text-studio-text text-xs">4 Active</span>
-        </div>
       </div>
     </header>
   );
