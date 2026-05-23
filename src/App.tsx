@@ -22,7 +22,7 @@ import { TinkercadViewport } from "./components/Viewports/TinkercadViewport";
 import { OpenSCADViewport } from "./components/Viewports/OpenSCADViewport";
 import { HYWorldViewport } from "./components/Viewports/HYWorldViewport";
 import { PhotogrammetryViewport } from "./components/Viewports/PhotogrammetryViewport";
-import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu, Palette, Zap, CodeSquare, Globe, ChevronRight, Camera } from "lucide-react";
+import { Box, Hammer, LayoutTemplate, Home, Compass, Cpu, Palette, Zap, CodeSquare, Globe, ChevronRight, Camera, ChevronDown } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useI18n } from "./lib/i18n";
 
@@ -136,32 +136,13 @@ export default function App() {
                   )}
                 </AnimatePresence>
              </div>
-             <div className="flex-1 overflow-y-auto px-3 space-y-1">
-               {toolsConfig.filter(tool => {
-                 const title = t(tool.titleKey) || tool.fallbackTitle;
-                 return title.toLowerCase().includes(searchFilter);
-               }).map((tool) => {
-                 const isActive = activeToolId === tool.id;
-                 const Icon = tool.icon;
-                 return (
-                   <button
-                     key={tool.id}
-                     data-name={t(tool.titleKey) || tool.fallbackTitle}
-                     onClick={() => setActiveToolId(tool.id)}
-                     className={cn(
-                       "workspace-item w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-2xl transition-all",
-                       isActive ? "bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] cursor-default" : "text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)] hover:text-[var(--md-sys-color-on-surface)] cursor-pointer"
-                     )}
-                   >
-                     <div className="flex items-center gap-3">
-                        <Icon className={cn("w-5 h-5", isActive ? "text-[var(--md-sys-color-primary)]" : "opacity-70")} />
-                        <span className="truncate">{t(tool.titleKey) || tool.fallbackTitle}</span>
-                     </div>
-                     {isActive && <ChevronRight className="w-4 h-4 opacity-70" />}
-                   </button>
-                 );
-               })}
-             </div>
+             <FileManagerSection 
+               searchFilter={searchFilter} 
+               activeToolId={activeToolId} 
+               setActiveToolId={setActiveToolId}
+               toolsConfig={toolsConfig}
+               t={t}
+             />
              <div className="p-4 border-t border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface)]">
                <SystemHealthMonitor />
              </div>
@@ -251,6 +232,82 @@ function PerformanceMetric({ label, value: defaultValue, max, unit, color, api }
     <div className="flex gap-2 items-center">
       <span className={cn("font-bold", color)}>{label}:</span> 
       {currentValue.toFixed(1)}{unit} / {max}{unit}
+    </div>
+  );
+}
+
+function FileManagerSection({ searchFilter, activeToolId, setActiveToolId, toolsConfig, t }: { searchFilter: string, activeToolId: string, setActiveToolId: (id: string) => void, toolsConfig: any[], t: any }) {
+  const [sortConfig, setSortConfig] = useState<{key: 'name' | 'type', dir: 'asc' | 'desc'}>({ key: 'name', dir: 'asc' });
+
+  const handleSort = (key: 'name' | 'type') => {
+    setSortConfig(current => ({
+      key,
+      dir: current.key === key && current.dir === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const filteredAndSorted = toolsConfig
+    .filter(tool => {
+      const title = t(tool.titleKey) || tool.fallbackTitle;
+      return title.toLowerCase().includes(searchFilter) || tool.file.toLowerCase().includes(searchFilter);
+    })
+    .sort((a, b) => {
+      let aVal = sortConfig.key === 'name' ? a.file : (t(a.titleKey) || a.fallbackTitle);
+      let bVal = sortConfig.key === 'name' ? b.file : (t(b.titleKey) || b.fallbackTitle);
+      
+      const comp = aVal.localeCompare(bVal);
+      return sortConfig.dir === 'asc' ? comp : -comp;
+    });
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 bg-[var(--md-sys-color-surface)]">
+      <div className="flex items-center justify-between px-6 py-2 border-b border-[var(--md-sys-color-outline-variant)] text-[10px] font-bold text-[var(--md-sys-color-on-surface-variant)] uppercase tracking-wider sticky top-0 bg-[var(--md-sys-color-surface)] z-10">
+        <button 
+          onClick={() => handleSort('name')}
+          className="flex items-center gap-1 hover:text-[var(--md-sys-color-on-surface)] text-[var(--md-sys-color-on-surface-variant)] transition-colors"
+        >
+          File Name
+          {sortConfig.key === 'name' && (
+            <ChevronDown className={cn("w-3 h-3 transition-transform", sortConfig.dir === 'asc' ? "rotate-180" : "")} />
+          )}
+        </button>
+        <button 
+          onClick={() => handleSort('type')}
+          className="flex items-center gap-1 hover:text-[var(--md-sys-color-on-surface)] text-[var(--md-sys-color-on-surface-variant)] transition-colors text-right"
+        >
+          Type
+          {sortConfig.key === 'type' && (
+            <ChevronDown className={cn("w-3 h-3 transition-transform", sortConfig.dir === 'asc' ? "rotate-180" : "")} />
+          )}
+        </button>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+        {filteredAndSorted.map((tool) => {
+          const isActive = activeToolId === tool.id;
+          const Icon = tool.icon;
+          return (
+            <button
+              key={tool.id}
+              data-name={t(tool.titleKey) || tool.fallbackTitle}
+              onClick={() => setActiveToolId(tool.id)}
+              className={cn(
+                "workspace-item w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-2xl transition-all",
+                isActive ? "bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] cursor-default" : "text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)] hover:text-[var(--md-sys-color-on-surface)] cursor-pointer"
+              )}
+            >
+              <div className="flex items-center gap-3 overflow-hidden">
+                <Icon className={cn("w-4 h-4 shrink-0", isActive ? "text-[var(--md-sys-color-primary)]" : "opacity-70")} />
+                <div className="flex flex-col items-start truncate">
+                  <span className="truncate text-xs font-semibold">{tool.file}</span>
+                  <span className="truncate text-[10px] opacity-70 uppercase tracking-widest">{t(tool.titleKey) || tool.fallbackTitle}</span>
+                </div>
+              </div>
+              {isActive && <ChevronRight className="w-4 h-4 opacity-70 shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
