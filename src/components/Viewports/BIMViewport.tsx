@@ -21,7 +21,7 @@ const getMaterialFeedRate = (material: string | undefined) => {
   return MATERIAL_SPECS[material as keyof typeof MATERIAL_SPECS]?.feedRate || 220;
 };
 
-export function BIMViewport() {
+export const BIMViewport = React.memo(() => {
   const { t } = useI18n();
   const { recordEvent } = useTelemetry("BIMViewport");
   const [isImporting, setIsImporting] = useState(false);
@@ -376,9 +376,9 @@ export function BIMViewport() {
       </div>
     </div>
   );
-}
+});
 
-function PropertySection({ title, id, children }: { title: string, id: string, children: React.ReactNode }) {
+const PropertySection = React.memo(({ title, id, children }: { title: string, id: string, children: React.ReactNode }) => {
   return (
     <div className="mb-2">
       <div className="text-[10px] text-white font-bold mb-1 flex justify-between items-center bg-white/5 px-1 py-0.5 rounded">
@@ -390,21 +390,21 @@ function PropertySection({ title, id, children }: { title: string, id: string, c
       </div>
     </div>
   );
-}
+});
 
-function PropertyRow({ label, value }: { label: string, value: string }) {
+const PropertyRow = React.memo(({ label, value }: { label: string, value: string }) => {
   return (
     <div className="flex justify-between items-center text-[9px]">
       <span className="text-zinc-500">{label}</span>
       <span className="text-zinc-300 font-medium">{value}</span>
     </div>
   );
-}
+});
 
-function ControlBtn({ icon: Icon }: { icon: any }) {
+const ControlBtn = React.memo(({ icon: Icon }: { icon: any }) => {
   return (
     <button className="p-1.5 bg-black/50 border border-white/10 text-zinc-400 hover:text-white hover:bg-orange-500/20 transition-all rounded">
       <Icon className="w-3.5 h-3.5" />
     </button>
   );
-}
+});

@@ -17,7 +17,7 @@ interface ProcessingNode {
   duration: number;
 }
 
-export function PhotogrammetryViewport() {
+export const PhotogrammetryViewport = React.memo(() => {
   const { t } = useI18n();
   const { recordEvent } = useTelemetry("PhotogrammetryViewport");
   const isMounted = React.useRef(true);
@@ -267,4 +267,4 @@ export function PhotogrammetryViewport() {
       </div>
     </div>
   );
-}
+});

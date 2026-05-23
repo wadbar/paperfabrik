@@ -3,7 +3,7 @@ import { Activity, ShieldCheck, Zap, AlertTriangle, ShieldAlert } from "lucide-r
 import { cn } from "../lib/utils";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-export function SystemHealthMonitor() {
+export const SystemHealthMonitor = React.memo(() => {
   const [stats, setStats] = useState({
     status: "NOMINAL",
     load: 12,
@@ -137,4 +137,4 @@ export function SystemHealthMonitor() {
       </div>
     </div>
   );
-}
+});

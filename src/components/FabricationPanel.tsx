@@ -16,7 +16,7 @@ interface FabricationPanelProps {
   actionText?: string;
 }
 
-export function FabricationPanel({
+export const FabricationPanel = React.memo(({
   id_num,
   title,
   filename,
@@ -26,7 +26,7 @@ export function FabricationPanel({
   className,
   children,
   actionText,
-}: FabricationPanelProps) {
+}: FabricationPanelProps) => {
   const { recordEvent } = useTelemetry(`PANEL_${id_num}`);
 
   const handleAction = () => {
@@ -82,5 +82,5 @@ export function FabricationPanel({
       </div>
     </motion.section>
   );
-}
+});
 

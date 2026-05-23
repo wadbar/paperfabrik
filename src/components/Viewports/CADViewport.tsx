@@ -36,7 +36,7 @@ interface RenderSettings {
 
 const WIREFRAME_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
-export function CADViewport() {
+export const CADViewport = React.memo(() => {
   const { t } = useI18n();
   const { recordEvent } = useTelemetry("CADViewport");
   
@@ -334,7 +334,12 @@ export function CADViewport() {
         
         // Advanced Shading Logic
         let fill = `rgba(59, 130, 246, ${intensity * 0.9})`;
-        if (savedSettings.shading === "Realistic") {
+        if (showStressMap && simResult) {
+            const avgStress = face.indices.reduce((sum, idx) => sum + simResult.stressValues[idx], 0) / face.indices.length;
+            const t = (avgStress - simResult.minStress) / (simResult.maxStress - simResult.minStress || 1);
+            const hue = Math.max(0, 240 - (t * 240)); // Blue (low) to Red (high)
+            fill = `hsla(${hue.toFixed(0)}, 85%, 50%, ${0.6 + intensity * 0.4})`;
+        } else if (savedSettings.shading === "Realistic") {
             const spec = Math.pow(intensity, 4);
             const baseColor = 100 + intensity * 60;
             const r = Math.min(255, baseColor + spec * 100);
@@ -512,6 +517,9 @@ export function CADViewport() {
                   </div>
                   <HUDItem icon={Orbit} value={`${(orbit.ry * 57.3).toFixed(1)}°`} label="Rotation" />
                   <HUDItem icon={Layers} value={savedSettings.shading} label="Mode" highlight />
+                  {showStressMap && simResult && (
+                      <HUDItem icon={Activity} value={`${simResult.maxStress.toFixed(3)} MPa`} label="Peak_Stress" highlight />
+                  )}
                 </div>
                 
                 <AnimatePresence initial={false}>
@@ -683,6 +691,14 @@ export function CADViewport() {
               <ActionButton onClick={() => setShowWireframeOverlay(!showWireframeOverlay)} active={showWireframeOverlay} title="Toggle Wireframe">
                  <Box className="w-3 h-3" />
               </ActionButton>
+              <ActionButton 
+                 onClick={() => setShowStressMap(!showStressMap)} 
+                 active={showStressMap} 
+                 title="Toggle Stress Map"
+                 disabled={!simResult}
+              >
+                 <Activity className="w-3 h-3" />
+              </ActionButton>
               <ActionButton onClick={undo} disabled={historyIndex === 0} title="Undo">
                  <Undo2 className="w-3 h-3" />
               </ActionButton>
@@ -848,7 +864,7 @@ export function CADViewport() {
                                  <path 
                                    key={i}
                                    d={face.path}
-                                   fill={showStressMap ? `hsla(${240 - (i / geometryData.faces.length) * 240}, 85%, 50%, 0.8)` : "none"}
+                                   fill={showStressMap ? face.fill : "none"}
                                    stroke={showStressMap ? "rgba(255,255,255,0.1)" : "currentColor"}
                                    strokeWidth={0.5}
                                    strokeLinejoin="round"
@@ -861,13 +877,14 @@ export function CADViewport() {
                           <div className="absolute top-4 left-4 flex gap-2 z-10">
                              <button
                                onClick={() => setShowStressMap(!showStressMap)}
+                               disabled={!simResult}
                                className={`px-3 py-1.5 text-[10px] rounded-lg tracking-wider font-bold shadow-lg transition-colors border backdrop-blur ${
                                  showStressMap 
                                    ? 'bg-orange-500/20 text-orange-400 border-orange-500/50' 
-                                   : 'bg-studio-panel/80 text-studio-text border-studio-border/50 hover:bg-studio-dots'
+                                   : 'bg-studio-panel/80 text-studio-text border-studio-border/50 hover:bg-studio-dots disabled:opacity-50 disabled:cursor-not-allowed'
                                }`}
                              >
-                               {showStressMap ? 'HIDE STRESS MAP' : 'STRESS MAP'}
+                               {showStressMap ? 'HIDE STRESS' : 'SHOW STRESS'}
                              </button>
                           </div>
 
@@ -924,27 +941,27 @@ export function CADViewport() {
       </div>
     </div>
   );
-}
+});
 
 // --- Internal Components ---
-function TreeItem({ name, icon: Icon, active }: { name: string, icon: any, active?: boolean }) {
+const TreeItem = React.memo(({ name, icon: Icon, active }: { name: string, icon: any, active?: boolean }) => {
   return (
     <div className={`group flex items-center gap-3 p-3 flex-1 rounded-xl cursor-pointer transition-all ${active ? 'bg-studio-accent/10 text-studio-accent font-bold' : 'text-studio-muted hover:text-studio-text hover:bg-studio-dots'}`}>
       <Icon className={`w-4 h-4 ${active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`} />
       <span className="text-xs truncate tracking-wide">{name}</span>
     </div>
   );
-}
+});
 
-function ToolIcon({ icon: Icon, active }: { icon: any, active?: boolean }) {
+const ToolIcon = React.memo(({ icon: Icon, active }: { icon: any, active?: boolean }) => {
   return (
     <button className={`p-3 rounded-2xl transition-all duration-300 ${active ? 'bg-studio-accent text-white shadow-lg md-elevation-2 scale-110' : 'text-studio-muted hover:text-studio-text hover:bg-studio-dots'}`}>
       <Icon className="w-5 h-5 stroke-[1.5px]" />
     </button>
   );
-}
+});
 
-function ParametricInput({ label, value, onChange, onCommit, min = 1, max = 500 }: { label: string, value: number, onChange: (v: number) => void, onCommit: () => void, min?: number, max?: number }) {
+const ParametricInput = React.memo(({ label, value, onChange, onCommit, min = 1, max = 500 }: { label: string, value: number, onChange: (v: number) => void, onCommit: () => void, min?: number, max?: number }) => {
   return (
      <div className="flex flex-col gap-1.5 text-xs text-studio-muted uppercase font-bold tracking-wider mb-4">
         <div className="flex justify-between items-center px-1">
@@ -961,9 +978,9 @@ function ParametricInput({ label, value, onChange, onCommit, min = 1, max = 500 
         />
      </div>
   );
-}
+});
 
-function HUDItem({ icon: Icon, value, label, highlight }: { icon: any, value: string, label: string, highlight?: boolean }) {
+const HUDItem = React.memo(({ icon: Icon, value, label, highlight }: { icon: any, value: string, label: string, highlight?: boolean }) => {
    return (
       <div className="flex flex-col gap-1 min-w-[60px]">
          <span className="text-[9px] text-studio-muted uppercase font-bold tracking-widest">{label}</span>
@@ -973,9 +990,9 @@ function HUDItem({ icon: Icon, value, label, highlight }: { icon: any, value: st
          </div>
       </div>
    );
-}
+});
 
-function ToolCluster({ active, onSelect, onResetPan }: { active: string, onSelect: (v: any) => void, onResetPan: () => void }) {
+const ToolCluster = React.memo(({ active, onSelect, onResetPan }: { active: string, onSelect: (v: any) => void, onResetPan: () => void }) => {
    return (
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center bg-studio-panel/90 backdrop-blur-xl border border-studio-border/50 rounded-full p-2 md-elevation-2 z-10 gap-2">
         <NavButton active={active === 'orbit'} onClick={() => onSelect('orbit')} title="Orbit Mode">
@@ -999,9 +1016,9 @@ function ToolCluster({ active, onSelect, onResetPan }: { active: string, onSelec
         </NavButton>
       </div>
    );
-}
+});
 
-function NavButton({ children, active, onClick, onDoubleClick, title }: { children: React.ReactNode, active: boolean, onClick: () => void, onDoubleClick?: () => void, title: string }) {
+const NavButton = React.memo(({ children, active, onClick, onDoubleClick, title }: { children: React.ReactNode, active: boolean, onClick: () => void, onDoubleClick?: () => void, title: string }) => {
    return (
       <button
         onClick={onClick}
@@ -1012,9 +1029,9 @@ function NavButton({ children, active, onClick, onDoubleClick, title }: { childr
         {children}
       </button>
    );
-}
+});
 
-function ActionButton({ children, onClick, disabled, active, variant, title }: { children: React.ReactNode, onClick: () => void, disabled?: boolean, active?: boolean, variant?: 'danger', title?: string }) {
+const ActionButton = React.memo(({ children, onClick, disabled, active, variant, title }: { children: React.ReactNode, onClick: () => void, disabled?: boolean, active?: boolean, variant?: 'danger', title?: string }) => {
    return (
       <button 
          onClick={onClick} 
@@ -1025,9 +1042,9 @@ function ActionButton({ children, onClick, disabled, active, variant, title }: {
          {children}
       </button>
    );
-}
+});
 
-function ToggleButton({ children, active, onClick, title }: { children: React.ReactNode, active: boolean, onClick: () => void, title: string }) {
+const ToggleButton = React.memo(({ children, active, onClick, title }: { children: React.ReactNode, active: boolean, onClick: () => void, title: string }) => {
    return (
       <button 
          onClick={onClick} 
@@ -1037,4 +1054,4 @@ function ToggleButton({ children, active, onClick, title }: { children: React.Re
          {children}
       </button>
    );
-}
+});

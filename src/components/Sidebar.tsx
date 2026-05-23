@@ -1,7 +1,8 @@
+import React from "react";
 import { Box, Cpu, HardDrive, Maximize2, Settings, Terminal } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 
-export function Sidebar() {
+export const Sidebar = React.memo(() => {
   return (
     <aside className="w-16 md:w-20 bg-studio-panel border-r border-studio-border flex flex-col items-center py-6 gap-8 shrink-0 z-50">
       <div className="w-10 h-10 bg-studio-accent rounded-xl flex items-center justify-center text-white font-black text-sm elevation-1">
@@ -24,7 +25,7 @@ export function Sidebar() {
       </div>
     </aside>
   );
-}
+});
 
 function SidebarItem({ icon: Icon, active }: { icon: any, active?: boolean }) {
   return (

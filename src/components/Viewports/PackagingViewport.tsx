@@ -1,7 +1,8 @@
+import React from "react";
 import { FileText, Printer, Target } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 
-export function PackagingViewport() {
+export const PackagingViewport = React.memo(() => {
   const { t } = useI18n();
   return (
     <div className="flex h-full flex-col font-mono text-[11px]">
@@ -40,4 +41,4 @@ export function PackagingViewport() {
       </div>
     </div>
   );
-}
+});

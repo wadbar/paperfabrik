@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
@@ -79,6 +79,7 @@ export default function App() {
 
   const activeTool = toolsConfig.find(t => t.id === activeToolId) || toolsConfig[0];
   const ActiveComponent = activeTool.component;
+  const memoizedActiveComponent = useMemo(() => <ActiveComponent />, [ActiveComponent]);
 
   return (
     <div className="flex flex-col h-screen w-full bg-[var(--md-sys-color-background)] overflow-hidden selection:bg-studio-accent/30 selection:text-studio-accent font-sans">
@@ -168,7 +169,7 @@ export default function App() {
                   actionText={t(activeTool.actionKey) || activeTool.fallbackAction || "EXECUTE"}
                   className="h-full"
                 >
-                  <ActiveComponent />
+                  {memoizedActiveComponent}
                 </FabricationPanel>
               </motion.div>
             </AnimatePresence>
@@ -192,7 +193,7 @@ export default function App() {
   );
 }
 
-function PerformanceMetric({ label, value: defaultValue, max, unit, color, api }: { label: string, value: number, max: number, unit: string, color: string, api?: string }) {
+const PerformanceMetric = React.memo(({ label, value: defaultValue, max, unit, color, api }: { label: string, value: number, max: number, unit: string, color: string, api?: string }) => {
   const [currentValue, setCurrentValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -234,19 +235,19 @@ function PerformanceMetric({ label, value: defaultValue, max, unit, color, api }
       {currentValue.toFixed(1)}{unit} / {max}{unit}
     </div>
   );
-}
+});
 
-function FileManagerSection({ searchFilter, activeToolId, setActiveToolId, toolsConfig, t }: { searchFilter: string, activeToolId: string, setActiveToolId: (id: string) => void, toolsConfig: any[], t: any }) {
+const FileManagerSection = React.memo(({ searchFilter, activeToolId, setActiveToolId, toolsConfig, t }: { searchFilter: string, activeToolId: string, setActiveToolId: (id: string) => void, toolsConfig: any[], t: any }) => {
   const [sortConfig, setSortConfig] = useState<{key: 'name' | 'type', dir: 'asc' | 'desc'}>({ key: 'name', dir: 'asc' });
 
-  const handleSort = (key: 'name' | 'type') => {
+  const handleSort = useCallback((key: 'name' | 'type') => {
     setSortConfig(current => ({
       key,
       dir: current.key === key && current.dir === 'asc' ? 'desc' : 'asc'
     }));
-  };
+  }, []);
 
-  const filteredAndSorted = toolsConfig
+  const filteredAndSorted = useMemo(() => toolsConfig
     .filter(tool => {
       const title = t(tool.titleKey) || tool.fallbackTitle;
       return title.toLowerCase().includes(searchFilter) || tool.file.toLowerCase().includes(searchFilter);
@@ -257,7 +258,7 @@ function FileManagerSection({ searchFilter, activeToolId, setActiveToolId, tools
       
       const comp = aVal.localeCompare(bVal);
       return sortConfig.dir === 'asc' ? comp : -comp;
-    });
+    }), [toolsConfig, sortConfig, searchFilter, t]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-[var(--md-sys-color-surface)]">
@@ -310,4 +311,4 @@ function FileManagerSection({ searchFilter, activeToolId, setActiveToolId, tools
       </div>
     </div>
   );
-}
+});

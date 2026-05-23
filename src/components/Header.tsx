@@ -1,8 +1,8 @@
 import { Activity, Bell, ChevronDown, Monitor, Search, Share2, Globe, Brain, Moon, Sun } from "lucide-react";
 import { useI18n } from "../lib/i18n";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
-export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
+export const Header = React.memo(({ onOpenAI }: { onOpenAI?: () => void }) => {
   const { language, setLanguage, t } = useI18n();
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -92,4 +92,4 @@ export function Header({ onOpenAI }: { onOpenAI?: () => void }) {
       </div>
     </header>
   );
-}
+});

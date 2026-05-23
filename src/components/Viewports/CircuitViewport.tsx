@@ -17,7 +17,7 @@ interface ComponentSpec {
   specs: Record<string, string>;
 }
 
-export function CircuitViewport() {
+export const CircuitViewport = React.memo(() => {
   const { t } = useI18n();
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [activeLayer, setActiveLayer] = useState<'top' | 'bottom' | 'silkscreen'>('top');
@@ -454,9 +454,9 @@ export function CircuitViewport() {
       </div>
     </div>
   );
-}
+});
 
-function BOMItem({ ref_id, name, isSelected, onClick }: { ref_id: string, name: string, isSelected: boolean, onClick: () => void }) {
+const BOMItem = React.memo(({ ref_id, name, isSelected, onClick }: { ref_id: string, name: string, isSelected: boolean, onClick: () => void }) => {
   return (
     <div 
         onClick={onClick}
@@ -466,4 +466,4 @@ function BOMItem({ ref_id, name, isSelected, onClick }: { ref_id: string, name: 
       <span className={`truncate ml-3 font-semibold ${isSelected ? 'text-studio-text' : 'text-studio-muted'}`}>{name}</span>
     </div>
   );
-}
+});
