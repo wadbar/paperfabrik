@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Activity, ShieldCheck, Zap, AlertTriangle, ShieldAlert } from "lucide-react";
 import { cn } from "../lib/utils";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { logger } from "../core/logger";
 
 export const SystemHealthMonitor = React.memo(() => {
   const [stats, setStats] = useState({
@@ -15,6 +16,7 @@ export const SystemHealthMonitor = React.memo(() => {
   const [history, setHistory] = useState<{time: number, load: number, ram: number}[]>([]);
   
   const [criticalTicks, setCriticalTicks] = useState(0);
+  const [memoryCriticalTicks, setMemoryCriticalTicks] = useState(0);
 
   useEffect(() => {
     const fetchStats = () => {
@@ -54,6 +56,18 @@ export const SystemHealthMonitor = React.memo(() => {
             } else {
               setCriticalTicks(0);
             }
+
+            if (ram > 90) {
+              setMemoryCriticalTicks(prev => {
+                const next = prev + 1;
+                if (next === 3) {
+                  logger.warn("SYSTEM_HEALTH", `HIGH_MEMORY_USAGE: Heap usage exceeded 90%`, { ram: ram.toFixed(2) });
+                }
+                return next;
+              });
+            } else {
+              setMemoryCriticalTicks(0);
+            }
         });
 
       } catch (e) {
@@ -87,6 +101,12 @@ export const SystemHealthMonitor = React.memo(() => {
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 flex items-start gap-2">
             <ShieldAlert className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
             <span className="text-[10px] text-red-500 font-bold leading-tight">CRITICAL THRESHOLD BREACHED: SYSTEM LOAD &gt; 85% FOR OVER 5 MIN</span>
+          </div>
+        )}
+        {memoryCriticalTicks >= 3 && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <span className="text-[10px] text-amber-500 font-bold leading-tight">CRITICAL THRESHOLD BREACHED: HEAP USAGE &gt; 90%</span>
           </div>
         )}
         <div className="flex justify-between items-end">
@@ -138,3 +158,4 @@ export const SystemHealthMonitor = React.memo(() => {
     </div>
   );
 });
+

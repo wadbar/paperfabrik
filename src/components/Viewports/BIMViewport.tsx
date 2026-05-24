@@ -5,7 +5,8 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { Home, Ruler, Layers, BoxSelect, ZoomIn, Upload, Download, FileUp, FileDown, CheckCircle2 } from "lucide-react";
+import { Home, Ruler, Layers, BoxSelect, ZoomIn, Upload, Download, FileUp, FileDown, CheckCircle2, AlertTriangle } from "lucide-react";
+import * as d3 from "d3";
 import { useI18n } from "../../lib/i18n";
 import { useTelemetry } from "../../hooks/useTelemetry";
 
@@ -33,6 +34,8 @@ export const BIMViewport = React.memo(() => {
     { id: "S-201", nameKey: "bim.wall_stud", fallbackName: "Wall Stud", material: "Pine", length: 2400, profile: "100x50mm", type: 'stud' },
   ]);
   const [selectedPartId, setSelectedPartId] = useState<string | null>("B-104");
+  const [materialPrice, setMaterialPrice] = useState<number>(5.00);
+  const [pricingMode, setPricingMode] = useState<'kg'|'m3'>('kg');
   
   const selectedPart = parts.find(p => p.id === selectedPartId);
 
@@ -226,6 +229,20 @@ export const BIMViewport = React.memo(() => {
                     <span>{MATERIAL_SPECS[selectedPart.material as keyof typeof MATERIAL_SPECS]?.density} g/cm³</span>
                   </div>
                 </div>
+                {(() => {
+                   const density = MATERIAL_SPECS[selectedPart.material as keyof typeof MATERIAL_SPECS]?.density || 0;
+                   const minRequiredDensity = selectedPart.length * 0.25;
+                   const isUnstable = (density * 1000) < minRequiredDensity;
+                   if (isUnstable) {
+                      return (
+                         <div className="mt-2 bg-red-500/10 border border-red-500/30 rounded p-1.5 flex items-start gap-1.5">
+                            <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
+                            <span className="text-[7.5px] text-red-400 font-bold leading-tight uppercase tracking-tighter uppercase">Structural Warning: Density ({density * 1000} kg/m³) below {minRequiredDensity} requirement for {selectedPart.length}mm span.</span>
+                         </div>
+                      );
+                   }
+                   return null;
+                })()}
                 <PropertyRow label={t("bim.join")} value={t("bim.join.val")} />
               </PropertySection>
             )}
@@ -237,6 +254,86 @@ export const BIMViewport = React.memo(() => {
                 <PropertyRow label={t("bim.time")} value={cncData ? `${cncData.machineTimeMinutes}m` : (isCncProcessing ? "Processing..." : "...")} />
               </PropertySection>
             )}
+
+            {selectedPart && (
+              <PropertySection title="Material Economics" id="ECONOMICS">
+                <div className="flex items-center gap-2 mb-2 justify-between">
+                  <div className="flex items-center gap-1">
+                    <span className={`text-[7px] uppercase ${pricingMode === 'kg' ? 'text-orange-500 font-black' : 'text-zinc-600 font-bold'}`}>KG</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={pricingMode === 'm3'} onChange={() => setPricingMode(prev => prev === 'kg' ? 'm3' : 'kg')} />
+                      <div className="w-5 h-2.5 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-zinc-400 after:border-zinc-300 after:rounded-full after:h-2 after:w-2 after:transition-all peer-checked:bg-orange-500/50 peer-checked:after:bg-orange-500"></div>
+                    </label>
+                    <span className={`text-[7px] uppercase ${pricingMode === 'm3' ? 'text-orange-500 font-black' : 'text-zinc-600 font-bold'}`}>M³</span>
+                  </div>
+                  <input 
+                     type="number" 
+                     className="w-12 bg-black border border-orange-500/30 text-white text-right px-1 py-0.5 rounded text-[8px] focus:border-orange-500 focus:outline-none transition-colors"
+                     value={materialPrice}
+                     onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        setMaterialPrice(isNaN(val) ? 0 : val);
+                     }}
+                     min={0}
+                     step={0.1}
+                  />
+                </div>
+                
+                {(() => {
+                  const [widthStr, heightStr] = selectedPart.profile.replace('mm','').split('x');
+                  const width = parseFloat(widthStr) || 0;
+                  const height = parseFloat(heightStr) || 0;
+                  const volumeCm3 = (width * height * selectedPart.length) / 1000;
+                  const density = MATERIAL_SPECS[selectedPart.material as keyof typeof MATERIAL_SPECS]?.density || 0;
+                  
+                  let cost = 0;
+                  if (pricingMode === 'kg') {
+                    const massKg = (volumeCm3 * density) / 1000;
+                    cost = massKg * materialPrice;
+                  } else {
+                    const volumeM3 = volumeCm3 / 1000000;
+                    cost = volumeM3 * materialPrice;
+                  }
+
+                  return (
+                    <PropertyRow label={`${selectedPart.id} Cost`} value={`$${cost.toFixed(2)}`} />
+                  );
+                })()}
+
+                <CostTrendChart material={selectedPart.material} />
+              </PropertySection>
+            )}
+
+            <div className="bg-orange-500/5 border border-orange-500/20 rounded p-1.5 mt-2">
+              <div className="text-[7.5px] text-orange-500/80 font-black uppercase mb-1 flex items-center justify-between">
+                <span>Project Summary</span>
+                <span>{parts.length} Parts</span>
+              </div>
+              {(() => {
+                 let totalCost = 0;
+                 parts.forEach(p => {
+                    const [widthStr, heightStr] = p.profile.replace('mm','').split('x');
+                    const width = parseFloat(widthStr) || 0;
+                    const height = parseFloat(heightStr) || 0;
+                    const volumeCm3 = (width * height * p.length) / 1000;
+                    const density = MATERIAL_SPECS[p.material as keyof typeof MATERIAL_SPECS]?.density || 0;
+                    
+                    if (pricingMode === 'kg') {
+                       const massKg = (volumeCm3 * density) / 1000;
+                       totalCost += massKg * materialPrice;
+                    } else {
+                       const volumeM3 = volumeCm3 / 1000000;
+                       totalCost += volumeM3 * materialPrice;
+                    }
+                 });
+                 return (
+                    <div className="flex justify-between items-end">
+                       <span className="text-[8px] text-zinc-400 uppercase font-bold tracking-widest leading-none">Total</span>
+                       <span className="text-sm text-orange-500 font-bold leading-none tracking-tight">${totalCost.toFixed(2)}</span>
+                    </div>
+                 );
+              })()}
+            </div>
           </div>
 
           <button className="w-full mt-auto py-1.5 bg-orange-600/20 border border-orange-500/50 text-orange-500 text-[8px] font-bold uppercase hover:bg-orange-600 hover:text-white transition-all flex items-center justify-center gap-1">
@@ -406,5 +503,91 @@ const ControlBtn = React.memo(({ icon: Icon }: { icon: any }) => {
     <button className="p-1.5 bg-black/50 border border-white/10 text-zinc-400 hover:text-white hover:bg-orange-500/20 transition-all rounded">
       <Icon className="w-3.5 h-3.5" />
     </button>
+  );
+});
+
+const CostTrendChart = React.memo(({ material }: { material: string }) => {
+  const chartRef = useRef<SVGSVGElement>(null);
+  
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const svg = d3.select(chartRef.current);
+    svg.selectAll("*").remove();
+
+    const density = MATERIAL_SPECS[material as keyof typeof MATERIAL_SPECS]?.density || 0.5;
+    const basePrice = density * 10; 
+    
+    // Deterministic pseudo-random generation to avoid flashing
+    const sfc32 = (a:number, b:number, c:number, d:number) => {
+       return function() {
+          a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0; 
+          var t = (a + b | 0) + d | 0;
+          d = d + 1 | 0;
+          a = b ^ b >>> 9;
+          b = c + (c << 3) | 0;
+          c = c << 21 | c >>> 11;
+          c = c + t | 0;
+          return (t >>> 0) / 4294967296;
+       }
+    };
+    const rand = sfc32(100, 200, 300, material.charCodeAt(0));
+
+    const data = Array.from({ length: 30 }, (_, i) => ({
+      date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000),
+      price: basePrice * (1 + Math.sin(i * 0.5) * 0.2 + rand() * 0.1)
+    }));
+
+     const width = 120;
+     const height = 30;
+     const margin = { top: 2, right: 2, bottom: 2, left: 2 };
+
+     const x = d3.scaleTime()
+       .domain(d3.extent(data, d => d.date) as [Date, Date])
+       .range([margin.left, width - margin.right]);
+
+     const y = d3.scaleLinear()
+       .domain([d3.min(data, d => d.price) as number * 0.9, d3.max(data, d => d.price) as number * 1.1])
+       .range([height - margin.bottom, margin.top]);
+
+     const line = d3.line<{date: Date, price: number}>()
+       .x(d => x(d.date))
+       .y(d => y(d.price))
+       .curve(d3.curveMonotoneX);
+
+     svg.append("path")
+       .datum(data)
+       .attr("fill", "none")
+       .attr("stroke", "#f97316")
+       .attr("stroke-width", 1)
+       .attr("d", line);
+       
+     // Sparkline area fill
+     const area = d3.area<{date: Date, price: number}>()
+       .x(d => x(d.date))
+       .y0(height)
+       .y1(d => y(d.price))
+       .curve(d3.curveMonotoneX);
+       
+     svg.append("path")
+       .datum(data)
+       .attr("fill", "url(#sparkline-gradient)")
+       .attr("d", area);
+       
+     // Defs for gradient
+     const defs = svg.append("defs");
+     const gradient = defs.append("linearGradient")
+        .attr("id", "sparkline-gradient")
+        .attr("x1", "0%").attr("y1", "0%")
+        .attr("x2", "0%").attr("y2", "100%");
+     gradient.append("stop").attr("offset", "0%").attr("stop-color", "#f97316").attr("stop-opacity", 0.4);
+     gradient.append("stop").attr("offset", "100%").attr("stop-color", "#f97316").attr("stop-opacity", 0.0);
+
+  }, [material]);
+
+  return (
+    <div className="mt-2 bg-black/40 rounded border border-white/5 relative h-8 overflow-hidden">
+      <div className="text-[6px] text-zinc-500 absolute top-1 left-1.5 uppercase font-bold tracking-widest z-10">30-Day FCST</div>
+      <svg ref={chartRef} width="100%" height="100%" viewBox="0 0 120 30" preserveAspectRatio="none" className="absolute inset-0" />
+    </div>
   );
 });
