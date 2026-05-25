@@ -6,6 +6,9 @@ import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 
+import { UniversalAuth } from "./src/core/universal/authShield.js";
+import { RateLimiter } from "./src/core/universal/rateLimiter.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -121,13 +124,22 @@ if (!isMainThread) {
     
     app.use(express.json());
 
-    // AI Streaming Interface (Industrial Pattern)
-    app.post("/api/ai/stream", async (req, res) => {
+    // Injecting Universal Modules
+    const apiLimiter = new RateLimiter(100, 20);
+    const apiAuth = new UniversalAuth();
+
+    // AI Streaming Interface (Industrial Pattern) with Rate Limiting Shield
+    app.post("/api/ai/stream", apiLimiter.middleware, async (req, res) => {
       const { message, history = [] } = req.body;
       
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+
+      let clientClosed = false;
+      req.on('close', () => {
+        clientClosed = true;
+      });
 
       try {
         const ai = getAIClient();
@@ -138,11 +150,14 @@ if (!isMainThread) {
           const words = simulatedResponse.split(" ");
           
           for (let i = 0; i < words.length; i++) {
+             if (clientClosed) break;
              res.write(`data: ${JSON.stringify({ text: words[i] + " " })}\n\n`);
              await new Promise(r => setTimeout(r, 50));
           }
-          res.write('data: [DONE]\n\n');
-          res.end();
+          if (!clientClosed) {
+            res.write('data: [DONE]\n\n');
+            res.end();
+          }
           return;
         }
 
@@ -159,18 +174,23 @@ if (!isMainThread) {
         const stream = await chat.sendMessageStream({ message });
 
         for await (const chunk of stream) {
+          if (clientClosed) break;
           const text = chunk.text;
           if (text) {
              res.write(`data: ${JSON.stringify({ text })}\n\n`);
           }
         }
         
-        res.write('data: [DONE]\n\n');
-        res.end();
+        if (!clientClosed) {
+          res.write('data: [DONE]\n\n');
+          res.end();
+        }
       } catch (err: any) {
-        logger.error("AI_COMPUTE", "Streaming failed", { error: err.message });
-        res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-        res.end();
+        if (!clientClosed) {
+          logger.error("AI_COMPUTE", "Streaming failed", { error: err.message });
+          res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+          res.end();
+        }
       }
     });
 

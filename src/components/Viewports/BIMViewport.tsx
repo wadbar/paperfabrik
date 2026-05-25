@@ -9,6 +9,9 @@ import { Home, Ruler, Layers, BoxSelect, ZoomIn, Upload, Download, FileUp, FileD
 import * as d3 from "d3";
 import { useI18n } from "../../lib/i18n";
 import { useTelemetry } from "../../hooks/useTelemetry";
+import { Mesh } from "../../core/mesh";
+import { Vector3 } from "../../core/geometry";
+import { SimulationService } from "../../core/simulation";
 
 const MATERIAL_SPECS = {
   Oak: { color: "#8B4513", density: 0.75, feedRate: 200 },
@@ -38,6 +41,33 @@ export const BIMViewport = React.memo(() => {
   const [pricingMode, setPricingMode] = useState<'kg'|'m3'>('kg');
   
   const selectedPart = parts.find(p => p.id === selectedPartId);
+
+  const beamSimulationResult = React.useMemo(() => {
+     const beam = parts.find(p => p.id === "B-104");
+     if (!beam) return null;
+     const l = beam.length;
+     const segments = 10;
+     const vertices: Vector3[] = [];
+     for (let i = 0; i <= segments; i++) {
+        vertices.push(new Vector3(0, 0, (i / segments) * l));
+     }
+     const mesh = new Mesh(vertices, []);
+     return SimulationService.simulateStaticLoad(mesh);
+  }, [parts]);
+
+  const beamStressStops = React.useMemo(() => {
+     if (!beamSimulationResult) return [];
+     const minS = beamSimulationResult.minStress;
+     const maxS = beamSimulationResult.maxStress;
+     const range = maxS - minS || 1;
+     
+     return beamSimulationResult.stressValues.map((stress, index) => {
+         const percent = (index / (beamSimulationResult.stressValues.length - 1)) * 100;
+         const normalizedStress = Math.max(0, Math.min(1, (stress - minS) / range));
+         const hue = (1.0 - normalizedStress) * 240; 
+         return { percent, color: `hsl(${hue}, 100%, 50%)` };
+     });
+  }, [beamSimulationResult]);
 
   const updateSelectedPart = (updates: Partial<typeof parts[0]>) => {
     if (!selectedPartId) return;
@@ -255,6 +285,28 @@ export const BIMViewport = React.memo(() => {
               </PropertySection>
             )}
 
+            {selectedPart && selectedPart.type === 'beam' && beamSimulationResult && (
+              <PropertySection title="Stress Analysis" id="SIM">
+                <div className="flex justify-between items-end mb-1">
+                   <span className="text-[8px] text-zinc-400">Load Distribution</span>
+                </div>
+                <svg className="h-2 w-full rounded" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="sidebar-stress-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      {beamStressStops.map((stop, i) => (
+                        <stop key={i} offset={`${stop.percent}%`} stopColor={stop.color} />
+                      ))}
+                    </linearGradient>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#sidebar-stress-gradient)"></rect>
+                </svg>
+                <div className="flex justify-between text-[7px] text-zinc-500 mt-1 uppercase tracking-tighter font-bold">
+                  <span>{beamSimulationResult.minStress.toFixed(2)} MPa</span>
+                  <span>{beamSimulationResult.maxStress.toFixed(2)} MPa</span>
+                </div>
+              </PropertySection>
+            )}
+
             {selectedPart && (
               <PropertySection title="Material Economics" id="ECONOMICS">
                 <div className="flex items-center gap-2 mb-2 justify-between">
@@ -393,18 +445,29 @@ export const BIMViewport = React.memo(() => {
                     const color = MATERIAL_SPECS[beam?.material as keyof typeof MATERIAL_SPECS]?.color || "currentColor";
                     const l = beam ? beam.length / 26.66 : 120;
                     const profileH = beam && beam.profile === "100x50mm" ? 13 : beam && beam.profile === "200x50mm" ? 26 : beam && beam.profile === "250x50mm" ? 33 : 20;
+                    const maxStressColor = beamStressStops.length > 0 ? beamStressStops[beamStressStops.length - 1].color : "rgba(239,68,68,0.8)";
+                    const maxStress = beamSimulationResult ? beamSimulationResult.maxStress : 0;
+                    const stressIntensity = Math.max(1, maxStress / 100);
                     return (
-                      <g style={{ color }}>
+                      <g style={{ color, '--stress-color': maxStressColor, '--stress-intensity': stressIntensity } as React.CSSProperties}>
+                        <defs>
+                           <linearGradient id="beam-stress-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                              {beamStressStops.map((stop, i) => (
+                                  <stop key={i} offset={`${stop.percent}%`} stopColor={stop.color} />
+                              ))}
+                           </linearGradient>
+                        </defs>
                         <motion.path 
                           onClick={() => setSelectedPartId("B-104")}
-                          className={`cursor-pointer transition-colors ${selectedPartId === "B-104" ? "fill-orange-500/40 stroke-current" : "fill-current/20 stroke-current/50 hover:fill-current/30"}`}
+                          className={`cursor-pointer transition-colors bim-beam ${selectedPartId === "B-104" ? "fill-orange-500/40" : "fill-current/20 hover:fill-current/30"}`}
                           d={`M 200 100 L ${200 + l} ${100 + l/2} L ${200 + l} ${100 + l/2 + profileH} L 200 ${100 + profileH} Z`} 
+                          stroke="url(#beam-stress-gradient)"
                           strokeWidth="1.5"
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: 0.5, duration: 1 }}
                         />
-                        <path d={`M ${200 + l} ${100 + l/2} L ${200 + l + 20} ${100 + l/2 - 10} L ${200 + l + 20} ${100 + l/2 - 10 + profileH} L ${200 + l} ${100 + l/2 + profileH}`} opacity="0.5" pointerEvents="none" />
+                        <path d={`M ${200 + l} ${100 + l/2} L ${200 + l + 20} ${100 + l/2 - 10} L ${200 + l + 20} ${100 + l/2 - 10 + profileH} L ${200 + l} ${100 + l/2 + profileH}`} opacity="0.5" pointerEvents="none" stroke="url(#beam-stress-gradient)" strokeWidth="1.5" fill="none" />
 
                        {/* Cutting Tool Path Indicator */}
                        {selectedPartId === "B-104" && (
